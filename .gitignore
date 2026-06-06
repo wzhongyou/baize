@@ -17,8 +17,17 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Build output
+baize
+cj
+agent_demo
+
+# Data directory (generated at runtime)
+data/
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
+node_modules/
 
 # Go workspace file
 go.work
