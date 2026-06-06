@@ -33,9 +33,32 @@ node_modules/
 go.work
 go.work.sum
 
-# env file
-.env
-
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Env / secrets
+.env
+.env.*
+
+# Go artifacts (legacy)
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+go.work
+go.work.sum
+/vendor/
+/cj
+/agent_demo
+supervisor
+conf/llmgate.toml
+
+# Web
+web/node_modules/
+web/dist/
+
+# Data
+data/
+.cangjie/
