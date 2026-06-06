@@ -98,59 +98,62 @@ go run ./examples/agent_demo
 ## 架构
 
 ```
-入口层
-├── CLI / TUI（Bubble Tea）  — 终端原生体验
-├── VS Code / JetBrains       — IDE 深度集成
-├── Web Dashboard             — 可视化管理（React + TypeScript）
-└── IM Gateway                — Telegram / Discord / Slack / WhatsApp / 微信
+入口层（已实现）
+├── CLI / TUI（Bubble Tea）  ✅ 终端原生体验
+├── Web Dashboard             ✅ 可视化管理（React + TypeScript）
+├── API Server                ✅ HTTP + WebSocket
+├── VS Code / JetBrains       📋 规划中
+└── IM Gateway                📋 规划中（Telegram / Discord / Slack）
 
-核心引擎
-├── Agent Orchestrator — ReAct / Plan-Execute / Multi-Agent / Human-in-the-Loop
-├── Graphflow 图引擎    — 节点编排、并行执行、检查点、流式输出
-├── Tool System         — 内置工具 + MCP 协议 + 插件扩展
-├── Context Engine      — LSP 代码理解 + 语义索引 + Git 感知
-├── Sandbox             — macOS Seatbelt / Linux Bubblewrap 原生沙箱
-├── Memory              — 短期/长期/事件记忆 + 向量存储
-├── Permission          — 分级权限（allow/deny/ask）+ 审计日志
-└── Session Manager     — 持久化、检查点、分支、上下文压缩
+核心引擎（已实现）
+├── Agent Orchestrator ✅ ReAct Agent + Supervisor（基于 Graphflow）
+├── Graphflow 图引擎    ✅ 节点编排、并行执行、流式输出
+├── Tool System         ✅ 内置工具（File/Shell/Git/Calculator）+ MCP 客户端
+├── Memory              ✅ 短期记忆 + 长期记忆接口
+├── Session Manager     ✅ 持久化 + 多会话
+├── Permission          ⚠️ 基础权限（策略引擎 + 审计日志框架）
+└── Context Engine      ⚠️ 项目文件分析
 
-基础设施
-├── Scheduler            — Cron 定时任务 + 异步长时 Agent
-├── Plugin System        — Go / WASM / 子进程 多形态插件
-└── Telemetry            — OpenTelemetry 可观测性
+核心引擎（规划中）
+├── Sandbox             📋 macOS Seatbelt / Linux Bubblewrap
+├── Plan-Execute Agent  📋 规划-执行模式
+├── Multi-Agent 协作     📋 多 Agent 管道 + 辩论模式
+├── LSP 代码智能         📋 Tree-sitter 解析 + 语义索引
+└── Vector Store        📋 向量嵌入 + 混合检索
+
+基础设施（规划中）
+├── Scheduler            📋 Cron 定时任务
+├── Plugin System        📋 WASM / 子进程插件
+└── Telemetry            📋 OpenTelemetry 可观测性
 ```
 
 ---
 
 ## 核心能力
 
-### 通用智能
-- **深度问答** — 联网搜索 + 多源验证 + 知识推理，不只是聊天
-- **多模态交互** — 图片理解、文档分析、语音交互（规划中）
-- **写作与创作** — 文章、报告、翻译、润色、头脑风暴
-- **办公效率** — 文档处理、表格分析、邮件撰写、日程管理
-- **编程开发** — 全栈代码生成、重构、调试、测试、部署
+### ✅ 已实现
+- **Agent 引擎** — ReAct Agent Loop + Supervisor Agent，基于 Graphflow 图执行
+- **多模型支持** — Anthropic Claude / OpenAI GPT / Gemini / DeepSeek / Ollama
+- **流式响应** — 逐 Token 实时输出，CLI Hook + Web SSE
+- **工具执行** — 文件读写、Shell 命令、Git 操作、计算器、MCP 客户端
+- **会话持久化** — SQLite 存储，多会话管理
+- **Web Dashboard** — React + TypeScript + Tailwind，AGUI 界面
+- **CLI / TUI** — Bubble Tea 终端 UI，交互式 + 单次模式
+- **MCP 协议** — 模型上下文协议客户端（工具发现 + 调用）
+- **结构化输出** — JSON Schema 约束 + 校验
+- **记忆系统** — 短期记忆接口 + 长期记忆接口
+- **权限框架** — 策略引擎 + 审计日志基础
+- **单二进制** — Go 编译，空闲 < 100MB
 
-### Agent 平台
-- **全 Go 技术栈** — 单二进制分发，空闲内存 < 100MB
-- **多入口统一** — CLI、TUI、IDE 插件、Web Dashboard、IM Bot
-- **多模型支持** — Anthropic Claude / OpenAI GPT / Gemini / DeepSeek / 本地模型
-- **Agent 图编排** — 基于 Graphflow，支持 ReAct / Plan-Execute / Multi-Agent / HITL
-- **流式响应** — 逐 Token 实时输出，思考过程可视化
-- **会话管理** — 持久化 + 检查点 + 会话分支 + 上下文智能压缩
-
-### 工具与安全
-- **丰富工具集** — 文件 / Shell / Git / 浏览器 / 搜索 / 代码理解
-- **MCP 协议** — 模型上下文协议，双向支持（客户端 + 服务端）
-- **原生沙箱** — macOS Seatbelt / Linux Bubblewrap，OS 级进程隔离
-- **权限系统** — allow/deny/ask 三级 + 策略引擎 + 完整审计日志
-- **LSP 集成** — Tree-sitter 多语言解析 + 语义嵌入索引
-
-### 平台与生态
-- **多渠道消息** — Telegram / Discord / Slack / WhatsApp / 微信 Bot
-- **定时调度** — Cron 定时任务 + 异步长时 Agent 执行
-- **插件生态** — WASM 插件 + 子进程插件，社区可扩展
-- **审计透明** — 每步操作有 diff 可审查，完整操作日志
+### 📋 规划中
+- **深度研究** — 联网搜索 + 多源验证 + 知识推理
+- **OS 沙箱** — macOS Seatbelt / Linux Bubblewrap 原生隔离
+- **Multi-Agent** — 多 Agent 协作、流水线、辩论
+- **IM Bot** — Telegram / Discord / Slack 多渠道
+- **定时调度** — Cron 任务 + 异步长时 Agent
+- **插件系统** — WASM + 子进程插件
+- **IDE 插件** — VS Code + JetBrains 深度集成
+- **代码智能** — LSP 集成 + Tree-sitter 索引 + 混合搜索
 
 ---
 
@@ -158,27 +161,34 @@ go run ./examples/agent_demo
 
 ```
 baize/
-├── cmd/baize/             # CLI/TUI 入口（主二进制）
-├── cmd/baized/            # 守护进程 / API Server
-├── agent/                 # Agent 抽象层（LLM、节点、消息、状态、结构化输出）
-├── orchestrator/          # Agent 编排器（ReAct / Plan / Multi / HITL）
-├── tool/                  # 工具系统（内置工具 + MCP 协议 + 插件注册）
-├── sandbox/               # OS 级沙箱（Seatbelt + Bubblewrap）
-├── context/               # 项目上下文引擎（LSP + 索引 + Git 感知）
-├── session/               # 会话管理（持久化 + 检查点 + 分支）
-├── permission/            # 权限系统（策略引擎 + 审计日志）
-├── memory/                # 记忆系统（短期 + 长期 + 向量存储）
-├── server/                # API Server（HTTP + WebSocket + gRPC）
-├── tui/                   # 终端 UI（Bubble Tea 框架）
-├── plugin/                # 插件系统（WASM + 子进程）
-├── gateway/               # 多渠道消息网关
-├── scheduler/             # 调度系统（Cron + 异步执行）
-├── conf/                  # 配置系统（TOML）
-├── web/                   # Web Dashboard（React + TypeScript + Vite）
-├── ide/                   # IDE 插件（VS Code + JetBrains）
-├── examples/              # 示例程序
-└── docs/                  # 技术文档
+├── cmd/baize/             ✅ CLI/TUI 入口（主二进制）
+├── agent/                 ✅ Agent 抽象层（LLM、节点、消息、状态、结构化输出）
+├── agent/llmgate/         ✅ LLM 多模型适配器
+├── orchestrator/          ✅ Agent 编排器（ReAct + Supervisor）
+├── tool/                  ✅ 工具系统
+├── tool/builtin/          ✅ 内置工具（File / Shell / Git / Calculator）
+├── tool/mcp/              ✅ MCP 协议（客户端 + 服务端）
+├── context/               ⚠️ 项目上下文（当前：文件分析；规划：LSP + 索引）
+├── session/               ✅ 会话管理（持久化 + 多会话）
+├── permission/            ⚠️ 权限系统（策略引擎 + 审计框架）
+├── memory/                ⚠️ 记忆系统（接口完成；规划：向量存储）
+├── server/                ✅ API Server（HTTP + WebSocket）
+├── server/middleware/      ✅ CORS + 日志中间件
+├── tui/                   ✅ 终端 UI（Bubble Tea）
+├── conf/                  ✅ 配置（TOML）
+├── web/                   ✅ Web Dashboard（React + TypeScript + Tailwind）
+├── examples/              ✅ 5 个示例程序
+├── docs/                  ✅ 技术文档
+│
+├── sandbox/               📋 OS 沙箱（规划中）
+├── plugin/                📋 插件系统（规划中）
+├── gateway/               📋 IM 网关（规划中）
+├── scheduler/             📋 调度系统（规划中）
+├── ide/                   📋 IDE 插件（规划中）
+└── cmd/baized/            📋 守护进程模式（规划中）
 ```
+
+> ✅ 已实现  ⚠️ 部分实现  📋 规划中
 
 ---
 

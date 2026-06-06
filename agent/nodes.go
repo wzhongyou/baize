@@ -11,14 +11,14 @@ import (
 
 // LLMNodeConfig configures an LLMNode.
 type LLMNodeConfig struct {
-	Model        LLMModel
-	SystemPrompt string
-	Tools        []Tool
-	Temperature  *float64
-	MaxTokens    *int
-	ThinkingType string // "disabled" to disable reasoning/thinking mode
-	Stream       bool
-	OnChunk      func(*StreamChunk)        // called for each streaming chunk
+	Model            LLMModel
+	SystemPrompt     string
+	Tools            []Tool
+	Temperature      *float64
+	MaxTokens        *int
+	ThinkingType     string // "disabled" to disable reasoning/thinking mode
+	Stream           bool
+	OnChunk          func(*StreamChunk)      // called for each streaming chunk
 	StructuredOutput *StructuredOutputConfig // structured output config
 }
 

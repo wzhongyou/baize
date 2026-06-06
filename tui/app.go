@@ -16,8 +16,8 @@ import (
 // Model represents the main application state.
 type Model struct {
 	// Input handling.
-	input    strings.Builder
-	cursor   int
+	input  strings.Builder
+	cursor int
 
 	// Messages.
 	messages []Message
@@ -32,8 +32,8 @@ type Model struct {
 	height int
 
 	// Agent connection (injected).
-	runner  AgentRunner
-	ctx     context.Context
+	runner AgentRunner
+	ctx    context.Context
 }
 
 // Message is a single chat message for display.
@@ -46,9 +46,9 @@ type Message struct {
 type Mode int
 
 const (
-	ModeInput  Mode = iota // Waiting for user input.
-	ModeThinking           // Agent is thinking.
-	ModeConfirm            // Waiting for permission confirmation.
+	ModeInput    Mode = iota // Waiting for user input.
+	ModeThinking             // Agent is thinking.
+	ModeConfirm              // Waiting for permission confirmation.
 )
 
 // AgentRunner is the interface for executing agent tasks from the TUI.

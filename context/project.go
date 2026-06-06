@@ -21,9 +21,9 @@ type Project struct {
 	TestTools  []string `json:"test_tools"`
 	Linters    []string `json:"linters"`
 
-	FileCount     int  `json:"file_count"`
-	LineCount     int  `json:"line_count"`
-	IsGitRepo     bool `json:"is_git_repo"`
+	FileCount int  `json:"file_count"`
+	LineCount int  `json:"line_count"`
+	IsGitRepo bool `json:"is_git_repo"`
 
 	PackageFile string   `json:"package_file"`
 	BuildFiles  []string `json:"build_files"`
@@ -34,16 +34,16 @@ type Project struct {
 
 // DirNode represents an entry in the project directory tree.
 type DirNode struct {
-	Name     string    `json:"name"`
-	IsDir    bool      `json:"is_dir"`
+	Name     string     `json:"name"`
+	IsDir    bool       `json:"is_dir"`
 	Children []*DirNode `json:"children,omitempty"`
 }
 
 // AnalysisOptions controls project analysis behavior.
 type AnalysisOptions struct {
-	MaxDepth       int      // Maximum directory depth to scan.
-	ExcludeDirs    []string // Directories to skip.
-	MaxFiles       int      // Maximum files to count (for large projects).
+	MaxDepth    int      // Maximum directory depth to scan.
+	ExcludeDirs []string // Directories to skip.
+	MaxFiles    int      // Maximum files to count (for large projects).
 }
 
 // DefaultAnalysisOptions returns sensible defaults.

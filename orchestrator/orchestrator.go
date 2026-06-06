@@ -44,10 +44,10 @@ type Config struct {
 
 // StepInfo describes a single step during orchestration.
 type StepInfo struct {
-	Step      int
-	NodeName  string
-	ToolCall  *agent.ToolCall
-	Duration  time.Duration
+	Step     int
+	NodeName string
+	ToolCall *agent.ToolCall
+	Duration time.Duration
 }
 
 // Planner analyzes intent and produces an execution plan.
@@ -68,12 +68,12 @@ type Plan struct {
 
 // PlanStep is a single step in an execution plan.
 type PlanStep struct {
-	ID          string   `json:"id"`
-	Description string   `json:"description"`
-	Tool        string   `json:"tool"`
+	ID          string         `json:"id"`
+	Description string         `json:"description"`
+	Tool        string         `json:"tool"`
 	Args        map[string]any `json:"args"`
-	Expected    string   `json:"expected"`
-	DependsOn   []string `json:"depends_on"`
+	Expected    string         `json:"expected"`
+	DependsOn   []string       `json:"depends_on"`
 }
 
 // Orchestrator is the unified agent execution engine.

@@ -63,8 +63,8 @@ type testTool struct {
 	execute     func(ctx context.Context, args map[string]any) (string, error)
 }
 
-func (t *testTool) Name() string             { return t.name }
-func (t *testTool) Description() string       { return t.description }
+func (t *testTool) Name() string               { return t.name }
+func (t *testTool) Description() string        { return t.description }
 func (t *testTool) Parameters() map[string]any { return t.params }
 func (t *testTool) Execute(ctx context.Context, args map[string]any) (string, error) {
 	return t.execute(ctx, args)

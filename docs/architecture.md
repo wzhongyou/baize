@@ -150,7 +150,7 @@ baize/
 │       └── chroma.go             # Chroma
 │
 ├── server/                       # [NEW] API Server
-│   ├── server.go                 # HTTP + WebSocket + gRPC 服务
+│   ├── server.go                 # HTTP + WebSocket 服务
 │   ├── rest/                     # REST API
 │   │   ├── agent.go              # Agent 执行 API
 │   │   ├── session.go            # 会话管理 API

@@ -41,9 +41,9 @@ type StreamEvent struct {
 
 // Config holds server configuration.
 type Config struct {
-	Port      int
-	Host      string
-	DataDir   string
+	Port    int
+	Host    string
+	DataDir string
 }
 
 // DefaultConfig returns reasonable defaults.
@@ -274,8 +274,8 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"session": map[string]any{
-				"id":        sess.ID,
-				"title":     sess.Title,
+				"id":         sess.ID,
+				"title":      sess.Title,
 				"created_at": sess.CreatedAt.Format(time.RFC3339),
 			},
 			"messages": sess.Messages,

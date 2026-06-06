@@ -48,5 +48,5 @@ type AuditFilter struct {
 // NoOpAuditLogger is an AuditLogger that discards all entries.
 type NoOpAuditLogger struct{}
 
-func (n *NoOpAuditLogger) Log(_ AuditEntry) error              { return nil }
+func (n *NoOpAuditLogger) Log(_ AuditEntry) error                    { return nil }
 func (n *NoOpAuditLogger) Query(_ AuditFilter) ([]AuditEntry, error) { return nil, nil }

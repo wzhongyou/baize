@@ -21,8 +21,10 @@ type CalculatorTool struct{}
 // Ensure CalculatorTool implements tool.Tool.
 var _ tool.Tool = (*CalculatorTool)(nil)
 
-func (c *CalculatorTool) Name() string        { return "calculator" }
-func (c *CalculatorTool) Description() string { return "Evaluate a mathematical expression. Supports +, -, *, /, and parentheses." }
+func (c *CalculatorTool) Name() string { return "calculator" }
+func (c *CalculatorTool) Description() string {
+	return "Evaluate a mathematical expression. Supports +, -, *, /, and parentheses."
+}
 func (c *CalculatorTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",

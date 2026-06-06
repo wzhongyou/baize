@@ -4,11 +4,11 @@ import "context"
 
 // ChatRequest is the input to an LLM call.
 type ChatRequest struct {
-	Messages     []Message
-	Tools        []ToolDef
-	Temperature  *float64
-	MaxTokens    *int
-	ThinkingType string         // "disabled" to disable reasoning/thinking mode
+	Messages       []Message
+	Tools          []ToolDef
+	Temperature    *float64
+	MaxTokens      *int
+	ThinkingType   string         // "disabled" to disable reasoning/thinking mode
 	ResponseFormat map[string]any // JSON Schema for structured output; nil = no constraint
 }
 
@@ -61,4 +61,3 @@ type SearchResult struct {
 	Score    float32
 	Metadata map[string]any
 }
-

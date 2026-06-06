@@ -95,59 +95,62 @@ go run ./examples/agent_demo
 ## Architecture
 
 ```
-Entry Layer
-├── CLI / TUI (Bubble Tea)      — native terminal experience
-├── VS Code / JetBrains         — deep IDE integration
-├── Web Dashboard (React + TS)  — visual agent management
-└── IM Gateway                  — Telegram / Discord / Slack / WhatsApp / WeChat
+Entry Layer (implemented)
+├── CLI / TUI (Bubble Tea)      ✅ native terminal experience
+├── Web Dashboard (React + TS)  ✅ visual agent management
+├── API Server                  ✅ HTTP + WebSocket
+├── VS Code / JetBrains         📋 planned
+└── IM Gateway                  📋 planned (Telegram / Discord / Slack)
 
-Core Engine
-├── Agent Orchestrator  — ReAct / Plan-Execute / Multi-Agent / Human-in-the-Loop
-├── Graphflow Engine    — DAG execution, parallel nodes, checkpoint, streaming
-├── Tool System         — built-in tools + MCP protocol + plugin extension
-├── Context Engine      — LSP code understanding + semantic index + Git-aware
-├── Sandbox             — macOS Seatbelt / Linux Bubblewrap (OS-level isolation)
-├── Memory              — short-term / long-term / episodic + vector store
-├── Permission          — tiered allow/deny/ask + audit trail
-└── Session Manager     — persistence, checkpoint, branching, context compaction
+Core Engine (implemented)
+├── Agent Orchestrator ✅ ReAct + Supervisor (powered by Graphflow)
+├── Graphflow Engine   ✅ DAG execution, parallel nodes, streaming
+├── Tool System        ✅ built-in (File/Shell/Git/Calculator) + MCP client
+├── Memory             ✅ short-term + long-term interfaces
+├── Session Manager    ✅ persistence + multi-session
+├── Permission         ⚠️ policy engine + audit framework
+└── Context Engine     ⚠️ project file analysis
 
-Infrastructure
-├── Scheduler           — Cron + async long-running agents
-├── Plugin System       — Go / WASM / subprocess multi-form plugins
-└── Telemetry           — OpenTelemetry observability
+Core Engine (planned)
+├── Sandbox            📋 macOS Seatbelt / Linux Bubblewrap
+├── Plan-Execute       📋 plan-then-execute agent mode
+├── Multi-Agent        📋 agent pipelines + debate mode
+├── LSP Integration    📋 Tree-sitter parsing + semantic index
+└── Vector Store       📋 embeddings + hybrid search
+
+Infrastructure (planned)
+├── Scheduler          📋 Cron jobs
+├── Plugin System      📋 WASM / subprocess plugins
+└── Telemetry          📋 OpenTelemetry observability
 ```
 
 ---
 
 ## Core Capabilities
 
-### General Intelligence
+### ✅ Implemented
+- **Agent Engine** — ReAct Agent Loop + Supervisor Agent on Graphflow DAG engine
+- **Multi-Model** — Anthropic Claude / OpenAI GPT / Google Gemini / DeepSeek / Ollama
+- **Streaming** — token-level real-time output via CLI hooks + Web SSE
+- **Tool Execution** — file I/O, shell commands, git operations, calculator, MCP client
+- **Session Persistence** — SQLite-backed, multi-session management
+- **Web Dashboard** — React + TypeScript + Tailwind AGUI interface
+- **CLI / TUI** — Bubble Tea terminal UI, interactive + single-shot modes
+- **MCP Protocol** — Model Context Protocol client (tool discovery + invocation)
+- **Structured Output** — JSON Schema constrained generation + validation
+- **Memory System** — short-term + long-term memory interfaces
+- **Permission Framework** — policy engine + audit log foundations
+- **Single Binary** — Go-compiled, <100MB idle
+
+### 📋 Planned
 - **Deep Research** — web search + multi-source verification + knowledge synthesis
-- **Multi-Modal** — image understanding, document analysis, voice (planned)
-- **Writing & Creation** — articles, reports, translation, editing, brainstorming
-- **Office Productivity** — document processing, spreadsheet analysis, email drafting
-- **Software Engineering** — full-stack code generation, refactoring, debugging, testing, deployment
-
-### Agent Platform
-- **Single Go Binary** — zero runtime dependencies, <100MB idle memory
-- **Multi-Surface** — CLI, TUI, IDE plugin, Web Dashboard, IM Bot — one API
-- **Multi-Model** — Anthropic Claude / OpenAI GPT / Google Gemini / DeepSeek / local (Ollama)
-- **Graph-Based Orchestration** — ReAct, Plan-Execute, Multi-Agent, Human-in-the-Loop
-- **Streaming Responses** — token-level real-time output, visible reasoning
-- **Session Management** — persistent, checkpointed, branchable, auto-compacting
-
-### Tools & Safety
-- **Rich Tool Set** — file ops, shell exec, git, browser, web search, code intelligence
-- **MCP Protocol** — Model Context Protocol, bidirectional (client + server)
-- **Native Sandbox** — macOS Seatbelt / Linux Bubblewrap, OS-level process isolation
-- **Permission System** — allow / deny / ask, policy engine, complete audit trail
-- **LSP Integration** — Tree-sitter multi-language parsing + semantic embedding index
-
-### Platform & Ecosystem
-- **Multi-Channel Messaging** — Telegram, Discord, Slack, WhatsApp, WeChat bots
-- **Scheduled Execution** — Cron jobs + async long-running agent tasks
-- **Plugin Ecosystem** — WASM plugins + subprocess plugins, community-extensible
-- **Audit Transparency** — every diff reviewable, complete operation logs
+- **OS Sandbox** — macOS Seatbelt / Linux Bubblewrap native isolation
+- **Multi-Agent** — agent collaboration, pipelines, debate
+- **IM Bots** — Telegram / Discord / Slack multi-channel
+- **Scheduler** — Cron jobs + async long-running agents
+- **Plugin System** — WASM + subprocess plugins
+- **IDE Plugins** — VS Code + JetBrains deep integration
+- **Code Intelligence** — LSP + Tree-sitter indexing + hybrid search
 
 ---
 
@@ -155,27 +158,34 @@ Infrastructure
 
 ```
 baize/
-├── cmd/baize/             # CLI / TUI entry point (main binary)
-├── cmd/baized/            # Daemon / API Server
-├── agent/                 # Agent abstraction (LLM, nodes, messages, state, structured output)
-├── orchestrator/          # Agent orchestration (ReAct / Plan / Multi / HITL)
-├── tool/                  # Tool system (built-in + MCP + plugin registry)
-├── sandbox/               # OS sandbox (Seatbelt + Bubblewrap)
-├── context/               # Project context engine (LSP + indexing + Git-aware)
-├── session/               # Session management (persistence + checkpointing)
-├── permission/            # Permission system (policy engine + audit)
-├── memory/                # Memory system (short-term + long-term + vector store)
-├── server/                # API Server (HTTP + WebSocket + gRPC)
-├── tui/                   # Terminal UI (Bubble Tea framework)
-├── plugin/                # Plugin system (WASM + subprocess)
-├── gateway/               # Multi-channel IM gateway
-├── scheduler/             # Job scheduler (Cron + async)
-├── conf/                  # Configuration (TOML)
-├── web/                   # Web Dashboard (React + TypeScript + Vite)
-├── ide/                   # IDE plugins (VS Code + JetBrains)
-├── examples/              # Example programs
-└── docs/                  # Technical documentation
+├── cmd/baize/             ✅ CLI / TUI entry point (main binary)
+├── agent/                 ✅ Agent abstraction (LLM, nodes, messages, state, structured output)
+├── agent/llmgate/         ✅ Multi-model LLM adapter
+├── orchestrator/          ✅ Agent orchestration (ReAct + Supervisor)
+├── tool/                  ✅ Tool system
+├── tool/builtin/          ✅ Built-in tools (File / Shell / Git / Calculator)
+├── tool/mcp/              ✅ MCP protocol (client + server)
+├── context/               ⚠️ Project context (current: file analysis; planned: LSP + index)
+├── session/               ✅ Session management (persistence + multi-session)
+├── permission/            ⚠️ Permission system (policy engine + audit framework)
+├── memory/                ⚠️ Memory system (interfaces done; planned: vector store)
+├── server/                ✅ API Server (HTTP + WebSocket)
+├── server/middleware/      ✅ CORS + logging middleware
+├── tui/                   ✅ Terminal UI (Bubble Tea)
+├── conf/                  ✅ Configuration (TOML)
+├── web/                   ✅ Web Dashboard (React + TypeScript + Tailwind)
+├── examples/              ✅ 5 example programs
+├── docs/                  ✅ Technical documentation
+│
+├── sandbox/               📋 OS sandbox (planned)
+├── plugin/                📋 Plugin system (planned)
+├── gateway/               📋 IM gateway (planned)
+├── scheduler/             📋 Job scheduler (planned)
+├── ide/                   📋 IDE plugins (planned)
+└── cmd/baized/            📋 Daemon mode (planned)
 ```
+
+> ✅ Implemented  ⚠️ Partial  📋 Planned
 
 ---
 

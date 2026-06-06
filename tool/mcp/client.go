@@ -90,7 +90,7 @@ type mcpToolAdapter struct {
 	inputSchema mcp.ToolInputSchema
 }
 
-func (t *mcpToolAdapter) Name() string       { return t.name }
+func (t *mcpToolAdapter) Name() string        { return t.name }
 func (t *mcpToolAdapter) Description() string { return t.description }
 func (t *mcpToolAdapter) Parameters() map[string]any {
 	return map[string]any{

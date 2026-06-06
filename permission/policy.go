@@ -10,9 +10,9 @@ import (
 type Operation struct {
 	Permission Permission
 	ToolName   string
-	Command    string   // For shell operations.
-	Path       string   // For file operations.
-	Domain     string   // For network operations.
+	Command    string // For shell operations.
+	Path       string // For file operations.
+	Domain     string // For network operations.
 	Args       map[string]any
 }
 
@@ -29,8 +29,8 @@ type PolicyRule struct {
 
 // PolicyEngine evaluates operations against a set of rules and learned decisions.
 type PolicyEngine struct {
-	rules    []PolicyRule
-	learned  map[string]DecisionRecord // keyed by a composite key of permission+target.
+	rules   []PolicyRule
+	learned map[string]DecisionRecord // keyed by a composite key of permission+target.
 }
 
 // NewPolicyEngine creates a PolicyEngine with the given rule set.

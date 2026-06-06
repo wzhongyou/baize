@@ -22,9 +22,9 @@ const (
 
 // Session represents a single agent conversation.
 type Session struct {
-	ID        string        `json:"id"`
-	Title     string        `json:"title"`
-	Messages  []agent.Message `json:"messages"`
+	ID       string          `json:"id"`
+	Title    string          `json:"title"`
+	Messages []agent.Message `json:"messages"`
 
 	// Metadata.
 	WorkspaceRoot string `json:"workspace_root"`
