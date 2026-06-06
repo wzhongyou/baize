@@ -1,0 +1,30 @@
+# Auto-detect text files, ensure LF line endings
+* text=auto
+
+# Go
+*.go text eol=lf diff=go
+go.mod text eol=lf diff=go
+go.sum text eol=lf
+
+# Web
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+
+# Config
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -6,6 +6,8 @@
 
 [![Go Version](https://img.shields.io/badge/go-%3E%3D1.25-blue)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wzhongyou/baize)](https://goreportcard.com/report/github.com/wzhongyou/baize)
+[![CI](https://github.com/wzhongyou/baize/actions/workflows/ci.yml/badge.svg)](https://github.com/wzhongyou/baize/actions/workflows/ci.yml)
 
 **Baize（白泽）** 是一个通用超级智能体平台。既能深度问答，也能自主执行复杂任务——写代码、做设计、查资料、写文档、处理数据、创作内容。通过 CLI / TUI / IDE 插件 / Web Dashboard / IM Bot 任一入口，访问同一个超级 Agent。
 

@@ -5,6 +5,8 @@
 
 [![Go Version](https://img.shields.io/badge/go-%3E%3D1.25-blue)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/wzhongyou/baize/actions/workflows/ci.yml/badge.svg)](https://github.com/wzhongyou/baize/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wzhongyou/baize)](https://goreportcard.com/report/github.com/wzhongyou/baize)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 
 **Baize** is an open-source **autonomous AI agent platform** — one agent, every interface. Deep reasoning, multi-step tool execution, web research, code generation, data analysis, document creation. Access via **CLI · TUI · IDE plugin · Web Dashboard · IM Bot**.
