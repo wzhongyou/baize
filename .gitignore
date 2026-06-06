@@ -18,9 +18,9 @@ coverage.*
 profile.cov
 
 # Build output
-baize
-cj
-agent_demo
+/baize
+/cj
+/agent_demo
 
 # Data directory (generated at runtime)
 data/
