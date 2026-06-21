@@ -4,8 +4,8 @@ go 1.25.7
 
 require (
 	github.com/mark3labs/mcp-go v0.54.1
-	github.com/wzhongyou/graphflow v0.2.0
 	github.com/wzhongyou/llmgate v0.3.0
+	github.com/wzhongyou/weave v0.4.0
 	modernc.org/sqlite v1.51.0
 )
 
@@ -27,5 +27,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace github.com/wzhongyou/graphflow v0.2.0 => ../graphflow

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/wzhongyou/graphflow/graph"
+	"github.com/wzhongyou/weave/graph"
 )
 
 // ── test helpers ───────────────────────────────────────────────────────────────

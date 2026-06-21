@@ -24,7 +24,7 @@ import (
 	llmgateadapter "github.com/wzhongyou/baize/agent/llmgate"
 	"github.com/wzhongyou/baize/server"
 	"github.com/wzhongyou/baize/tool/builtin"
-	"github.com/wzhongyou/graphflow/graph"
+	"github.com/wzhongyou/weave/graph"
 	"github.com/wzhongyou/llmgate/sdk"
 )
 

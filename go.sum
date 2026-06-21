@@ -42,6 +42,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/wzhongyou/llmgate v0.3.0 h1:EaJY893IVihrUdoj/U9WNRTF6duGCDWAXeGNaqN0KNc=
 github.com/wzhongyou/llmgate v0.3.0/go.mod h1:W8+EkLmSryWTEtJQpebYNBTM4Qh5rA6P/d5Z3kLr4QE=
+github.com/wzhongyou/weave v0.4.0 h1:A8SiAaRjFrnHGk4pLVtz7e2LZv+LJikb+dFGonpdvjA=
+github.com/wzhongyou/weave v0.4.0/go.mod h1:n/+HO/sLezk/lMUvqbVWqaZEi9eJ/kZPkLENNQu3+s8=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 golang.org/x/mod v0.33.0 h1:tHFzIWbBifEmbwtGz65eaWyGiGZatSrT9prnU8DbVL8=

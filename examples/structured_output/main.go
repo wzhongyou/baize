@@ -13,7 +13,7 @@ import (
 	"fmt"
 
 	"github.com/wzhongyou/baize/agent"
-	"github.com/wzhongyou/graphflow/graph"
+	"github.com/wzhongyou/weave/graph"
 )
 
 func main() {

@@ -31,7 +31,7 @@ Baize（白泽）是一个通用超级智能体，全 Go 实现（前端 TypeScr
 ## 快速链接
 
 - **代码仓库**: [github.com/wzhongyou/baize](https://github.com/wzhongyou/baize)
-- **核心依赖**: [Graphflow](https://github.com/wzhongyou/graphflow) (图引擎) | [llmgate](https://github.com/wzhongyou/llmgate) (LLM 网关)
+- **核心依赖**: [Weave](https://github.com/wzhongyou/weave) (图引擎) | [llmgate](https://github.com/wzhongyou/llmgate) (LLM 网关)
 
 ## 技术栈
 

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/wzhongyou/baize/agent"
-	"github.com/wzhongyou/graphflow/graph"
+	"github.com/wzhongyou/weave/graph"
 )
 
 // Mode identifies the orchestration pattern.

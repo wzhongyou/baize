@@ -219,7 +219,7 @@ baize/
 
 ```
 Baize（白泽）                  → 通用超级智能体（本仓库）
-  ├── github.com/wzhongyou/graphflow  → 图执行引擎
+  ├── github.com/wzhongyou/weave      → 图执行引擎
   └── github.com/wzhongyou/llmgate    → LLM 多模型网关
 
 Cangjie（仓颉）                 → 代码智能平台（VSCode 插件 + 代码搜索 + Agent）

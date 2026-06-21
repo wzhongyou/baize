@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wzhongyou/graphflow/graph"
+	"github.com/wzhongyou/weave/graph"
 )
 
 // LLMNodeConfig configures an LLMNode.

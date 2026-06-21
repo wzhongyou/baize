@@ -17,9 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Clone graphflow (needed by go.mod replace)
-      run: git clone https://github.com/wzhongyou/graphflow.git ../graphflow
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
@@ -48,9 +45,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Clone graphflow (needed by go.mod replace)
-      run: git clone https://github.com/wzhongyou/graphflow.git ../graphflow
 
     - name: Set up Go
       uses: actions/setup-go@v5

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wzhongyou/graphflow/graph"
+	"github.com/wzhongyou/weave/graph"
 )
 
 // ── ReActAgent ──────────────────────────────────────────────────────────────────
