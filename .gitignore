@@ -33,9 +33,12 @@ node_modules/
 go.work
 go.work.sum
 
+# macOS
+.DS_Store
+
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
 
 # Env / secrets
 .env

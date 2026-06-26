@@ -17,6 +17,7 @@ type ReActAgentConfig struct {
 	SystemPrompt string
 	Tools        []Tool
 	MaxSteps     int
+	PermChecker  PermissionChecker // optional: permission check before tool execution
 }
 
 // ReActAgent builds a Reason-Act loop graph.
@@ -45,6 +46,9 @@ func (a *ReActAgent) BuildGraph() (*graph.Graph[*MessageState], error) {
 		Tools:        a.cfg.Tools,
 	})
 	toolNode := NewToolNode(a.cfg.Tools...)
+	if a.cfg.PermChecker != nil {
+		toolNode.WithPermissionChecker(a.cfg.PermChecker)
+	}
 
 	g := graph.NewGraph[*MessageState](a.cfg.Name)
 	g.AddNode("llm", llmNode.Run)

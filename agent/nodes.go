@@ -147,10 +147,17 @@ type ToolNodeConfig struct {
 	Parallel bool // if true execute tools concurrently
 }
 
+// PermissionChecker checks whether a tool is allowed to execute.
+// Returns decision ("allow"|"deny"|"ask") and a reason string.
+type PermissionChecker interface {
+	CheckPermission(ctx context.Context, toolName string, args map[string]any) (string, string)
+}
+
 // ToolNode executes pending tool calls found in the last assistant message.
 type ToolNode struct {
 	registry *ToolRegistry
 	parallel bool
+	perm     PermissionChecker
 }
 
 // NewToolNode creates a ToolNode backed by the given tools.
@@ -165,6 +172,12 @@ func NewToolNode(tools ...Tool) *ToolNode {
 // NewToolNodeWithRegistry creates a ToolNode from an existing registry.
 func NewToolNodeWithRegistry(registry *ToolRegistry) *ToolNode {
 	return &ToolNode{registry: registry}
+}
+
+// WithPermissionChecker injects a permission checker into the tool node.
+func (n *ToolNode) WithPermissionChecker(pc PermissionChecker) *ToolNode {
+	n.perm = pc
+	return n
 }
 
 // Run implements graph.NodeFunc[*MessageState].
@@ -195,6 +208,18 @@ func (n *ToolNode) executeToolCall(ctx context.Context, tc ToolCall) string {
 	if !ok {
 		return fmt.Sprintf("error: tool %q not found", tc.Name)
 	}
+
+	// Permission check (non-bypassable — runs before every tool execution).
+	if n.perm != nil {
+		decision, reason := n.perm.CheckPermission(ctx, tc.Name, tc.Arguments)
+		switch decision {
+		case "deny":
+			return fmt.Sprintf("Permission denied: %s", reason)
+		case "ask":
+			return fmt.Sprintf("Confirmation required: %s", reason)
+		}
+	}
+
 	result, err := tool.Execute(ctx, tc.Arguments)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)

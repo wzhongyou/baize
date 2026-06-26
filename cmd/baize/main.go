@@ -20,10 +20,15 @@ import (
 	"syscall"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/wzhongyou/baize/agent"
 	llmgateadapter "github.com/wzhongyou/baize/agent/llmgate"
+	"github.com/wzhongyou/baize/memory"
+	"github.com/wzhongyou/baize/permission"
 	"github.com/wzhongyou/baize/server"
+	"github.com/wzhongyou/baize/tool"
 	"github.com/wzhongyou/baize/tool/builtin"
+	"github.com/wzhongyou/baize/tui"
 	"github.com/wzhongyou/weave/graph"
 	"github.com/wzhongyou/llmgate/sdk"
 )
@@ -36,7 +41,8 @@ var (
 	maxSteps   = flag.Int("max-steps", 30, "Maximum agent execution steps")
 	verbose    = flag.Bool("verbose", false, "Enable verbose output")
 
-	// Server flags.
+	// TUI / Server flags.
+	noTui      = flag.Bool("no-tui", false, "Disable Bubble Tea TUI (use simple REPL)")
 	serverPort = flag.Int("port", 9779, "Server listen port")
 	serverHost = flag.String("host", "127.0.0.1", "Server listen host")
 )
@@ -66,7 +72,9 @@ func main() {
 		log.Fatalf("Invalid workspace: %v", err)
 	}
 
-	tools := buildTools(wsRoot)
+	reg := buildToolRegistry(wsRoot)
+	tools := reg.List()
+	permChecker := buildPermChecker(reg, wsRoot)
 	question := flag.Arg(0)
 
 	if *verbose {
@@ -75,13 +83,22 @@ func main() {
 	}
 
 	if question != "" {
-		runSingleShot(ctx, llm, tools, wsRoot, question)
+		runSingleShot(ctx, llm, tools, permChecker, wsRoot, question)
+	} else if *noTui {
+		runSimpleREPL(ctx, llm, tools, permChecker, wsRoot)
 	} else {
-		runInteractive(ctx, llm, tools, wsRoot)
+		runTUI(llm, tools, permChecker, wsRoot)
 	}
 }
 
-// ── Server mode ────────────────────────────────────────────────────────────────
+// ── Permission ──────────────────────────────────────────────────────────────
+
+func buildPermChecker(reg *tool.ToolRegistry, wsRoot string) agent.PermissionChecker {
+	pe := permission.NewPolicyEngine(permission.DefaultPolicy(wsRoot))
+	return pe.AsAgentChecker(reg)
+}
+
+// ── Server mode ─────────────────────────────────────────────────────────────
 
 func runServer() {
 	llm := buildLLM()
@@ -89,69 +106,103 @@ func runServer() {
 		log.Fatal("No LLM configured. Set up conf/llmgate.toml.")
 	}
 	wsRoot, _ := filepath.Abs(*workspace)
-	tools := buildTools(wsRoot)
+	reg := buildToolRegistry(wsRoot)
+	tools := reg.List()
 
 	runner := &agentRunner{
-		llm:       llm,
-		tools:     tools,
-		sysPrompt: buildSystemPrompt(wsRoot),
-		maxSteps:  *maxSteps,
+		llm:         llm,
+		tools:       tools,
+		sysPrompt:   buildSystemPrompt(wsRoot),
+		maxSteps:    *maxSteps,
+		permChecker: buildPermChecker(reg, wsRoot),
+	}
+
+	// Build server with tools and optional memory.
+	opts := []server.Option{
+		server.WithTools(reg.AsToolProvider()),
+	}
+	if memDir := os.Getenv("BAIZE_MEMORY_DIR"); memDir != "" {
+		if ms, err := memory.NewMarkdownStore(memDir); err == nil {
+			opts = append(opts, server.WithMemory(ms))
+			log.Printf("Memory: %s", memDir)
+		}
 	}
 
 	srv, err := server.New(runner, server.Config{
 		Port:    *serverPort,
 		Host:    *serverHost,
 		DataDir: "./data",
-	})
+	}, opts...)
 	if err != nil {
 		log.Fatalf("Server: %v", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "Baize Server\n")
 	fmt.Fprintf(os.Stderr, "  AGUI: http://%s:%d\n", *serverHost, *serverPort)
-	fmt.Fprintf(os.Stderr, "  API:  http://%s:%d/api/health\n", *serverHost, *serverPort)
+	fmt.Fprintf(os.Stderr, "  API:  http://%s:%d/api/v1/health\n", *serverHost, *serverPort)
+	fmt.Fprintf(os.Stderr, "  Tools: %d registered\n", len(tools))
 
 	if err := srv.Start(); err != nil {
 		log.Fatalf("Server: %v", err)
 	}
 }
 
-// ── Agent runner (bridges server.AgentRunner to ReAct agent) ───────────────────
+// ── Agent runner (bridges server.AgentRunner to ReAct agent) ────────────────
 
 type agentRunner struct {
-	llm       agent.LLMModel
-	tools     []agent.Tool
-	sysPrompt string
-	maxSteps  int
+	llm         agent.LLMModel
+	tools       []agent.Tool
+	sysPrompt   string
+	maxSteps    int
+	permChecker agent.PermissionChecker
 }
 
-func (r *agentRunner) Run(ctx context.Context, state *agent.MessageState) (*agent.MessageState, error) {
+func (r *agentRunner) Run(ctx context.Context, req server.AgentRunRequest) (*server.AgentRunResult, error) {
+	maxSteps := req.MaxSteps
+	if maxSteps <= 0 {
+		maxSteps = r.maxSteps
+	}
 	ag := agent.NewReActAgent(agent.ReActAgentConfig{
 		Name:         "agui",
 		LLM:          r.llm,
 		SystemPrompt: r.sysPrompt,
 		Tools:        r.tools,
-		MaxSteps:     r.maxSteps,
+		MaxSteps:     maxSteps,
+		PermChecker:  r.permChecker,
 	})
 	g, err := ag.BuildGraph()
 	if err != nil {
 		return nil, err
 	}
 	engine := graph.NewEngine(g)
-	result, err := engine.Run(ctx, state)
+	result, err := engine.Run(ctx, &agent.MessageState{
+		Messages: []agent.Message{
+			{Role: agent.RoleUser, Content: req.Message},
+		},
+		MaxSteps: maxSteps,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return result.FinalState, nil
+	return &server.AgentRunResult{
+		Content: lastAssistantContent(result.FinalState),
+		Tokens:  result.FinalState.TotalTokens,
+		Steps:   result.TotalSteps,
+	}, nil
 }
 
-func (r *agentRunner) RunStream(ctx context.Context, state *agent.MessageState, onEvent func(server.StreamEvent)) {
+func (r *agentRunner) RunStream(ctx context.Context, req server.AgentRunRequest, onEvent func(server.StreamEvent)) {
+	maxSteps := req.MaxSteps
+	if maxSteps <= 0 {
+		maxSteps = r.maxSteps
+	}
 	ag := agent.NewReActAgent(agent.ReActAgentConfig{
 		Name:         "agui",
 		LLM:          r.llm,
 		SystemPrompt: r.sysPrompt,
 		Tools:        r.tools,
-		MaxSteps:     r.maxSteps,
+		MaxSteps:     maxSteps,
+		PermChecker:  r.permChecker,
 	})
 	g, err := ag.BuildGraph()
 	if err != nil {
@@ -161,19 +212,33 @@ func (r *agentRunner) RunStream(ctx context.Context, state *agent.MessageState, 
 
 	engine := graph.NewEngine(g)
 	hook := &streamHook{onEvent: onEvent}
+	state := &agent.MessageState{
+		Messages: []agent.Message{
+			{Role: agent.RoleUser, Content: req.Message},
+		},
+		MaxSteps: maxSteps,
+	}
 	result, err := engine.Run(ctx, state, graph.WithHook(hook))
 	if err != nil {
 		onEvent(server.StreamEvent{Type: "error", Content: err.Error()})
 		return
 	}
 
-	if result != nil && len(result.FinalState.Messages) > 0 {
-		last := result.FinalState.Messages[len(result.FinalState.Messages)-1]
-		if last.Role == agent.RoleAssistant && last.Content != "" {
-			onEvent(server.StreamEvent{Type: "answer", Content: last.Content})
-		}
+	if content := lastAssistantContent(result.FinalState); content != "" {
+		onEvent(server.StreamEvent{Type: "answer", Content: content})
 	}
 	onEvent(server.StreamEvent{Type: "done", Tokens: result.FinalState.TotalTokens})
+}
+
+func lastAssistantContent(state *agent.MessageState) string {
+	if state == nil || len(state.Messages) == 0 {
+		return ""
+	}
+	last := state.Messages[len(state.Messages)-1]
+	if last.Role == agent.RoleAssistant && last.Content != "" {
+		return last.Content
+	}
+	return ""
 }
 
 type streamHook struct{ onEvent func(server.StreamEvent) }
@@ -199,9 +264,9 @@ func (h *streamHook) OnNodeEnd(_ context.Context, _ string, s *agent.MessageStat
 }
 func (h *streamHook) OnRetry(_ context.Context, _ string, _ int, _ error) {}
 
-// ── Core execution ─────────────────────────────────────────────────────────────
+// ── Core execution ──────────────────────────────────────────────────────────
 
-func runSingleShot(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, wsRoot, question string) {
+func runSingleShot(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, permChecker agent.PermissionChecker, wsRoot, question string) {
 	startTime := time.Now()
 	ag := agent.NewReActAgent(agent.ReActAgentConfig{
 		Name:         "baize",
@@ -209,6 +274,7 @@ func runSingleShot(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, 
 		SystemPrompt: buildSystemPrompt(wsRoot),
 		Tools:        tools,
 		MaxSteps:     *maxSteps,
+		PermChecker:  permChecker,
 	})
 	g, err := ag.BuildGraph()
 	if err != nil {
@@ -232,7 +298,7 @@ func runSingleShot(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, 
 		result.TotalSteps, duration, result.FinalState.TotalTokens)
 }
 
-func runInteractive(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, wsRoot string) {
+func runSimpleREPL(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, permChecker agent.PermissionChecker, wsRoot string) {
 	fmt.Println("Baize Interactive Mode")
 	fmt.Print("Type /help for commands, /quit to exit.\n\n")
 
@@ -258,12 +324,105 @@ func runInteractive(ctx context.Context, llm agent.LLMModel, tools []agent.Tool,
 			fmt.Printf("Unknown: %s\n", line)
 			continue
 		}
-		runSingleShot(ctx, llm, tools, wsRoot, line)
+		runSingleShot(ctx, llm, tools, permChecker, wsRoot, line)
 		fmt.Println()
 	}
 }
 
-// ── LLM ────────────────────────────────────────────────────────────────────────
+func runTUI(llm agent.LLMModel, tools []agent.Tool, permChecker agent.PermissionChecker, wsRoot string) {
+	runner := &tuiAgentRunner{
+		llm:         llm,
+		tools:       tools,
+		permChecker: permChecker,
+		sysPrompt:   buildSystemPrompt(wsRoot),
+		maxSteps:    *maxSteps,
+	}
+
+	cfg := tui.Config{
+		Workspace: wsRoot,
+		Model:     *modelName,
+		Provider:  *provider,
+	}
+
+	model := tui.New(runner, cfg)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		log.Fatalf("TUI: %v", err)
+	}
+}
+
+// tuiAgentRunner adapts the agent to tui.StreamRunner.
+type tuiAgentRunner struct {
+	llm         agent.LLMModel
+	tools       []agent.Tool
+	permChecker agent.PermissionChecker
+	sysPrompt   string
+	maxSteps    int
+}
+
+func (r *tuiAgentRunner) RunStream(ctx context.Context, input string, onEvent func(tui.StreamEvent)) {
+	ag := agent.NewReActAgent(agent.ReActAgentConfig{
+		Name:         "baize-tui",
+		LLM:          r.llm,
+		SystemPrompt: r.sysPrompt,
+		Tools:        r.tools,
+		MaxSteps:     r.maxSteps,
+		PermChecker:  r.permChecker,
+	})
+	g, err := ag.BuildGraph()
+	if err != nil {
+		onEvent(tui.StreamEvent{Type: "error", Content: err.Error()})
+		return
+	}
+
+	engine := graph.NewEngine(g)
+	hook := &tuiStreamHook{onEvent: onEvent}
+	state := &agent.MessageState{
+		Messages: []agent.Message{
+			{Role: agent.RoleUser, Content: input},
+		},
+		MaxSteps: r.maxSteps,
+	}
+	result, err := engine.Run(ctx, state, graph.WithHook(hook))
+	if err != nil {
+		onEvent(tui.StreamEvent{Type: "error", Content: err.Error()})
+		return
+	}
+
+	if content := lastAssistantContent(result.FinalState); content != "" {
+		onEvent(tui.StreamEvent{Type: "answer", Content: content})
+	}
+	onEvent(tui.StreamEvent{Type: "done", Tokens: result.FinalState.TotalTokens})
+}
+
+type tuiStreamHook struct{ onEvent func(tui.StreamEvent) }
+
+func (h *tuiStreamHook) OnGraphStart(_ context.Context, _ string, _ *agent.MessageState)        {}
+func (h *tuiStreamHook) OnGraphEnd(_ context.Context, _ string, _ *agent.MessageState, _ error) {}
+func (h *tuiStreamHook) OnNodeStart(_ context.Context, _ string, _ *agent.MessageState)         {}
+func (h *tuiStreamHook) OnNodeEnd(_ context.Context, _ string, s *agent.MessageState, _ error, _ time.Duration) {
+	if len(s.Messages) == 0 {
+		return
+	}
+	last := s.Messages[len(s.Messages)-1]
+	switch {
+	case len(last.ToolCalls) > 0:
+		for _, tc := range last.ToolCalls {
+			h.onEvent(tui.StreamEvent{
+				Type:     "tool_call",
+				ToolName: tc.Name,
+				ToolArgs: fmt.Sprintf("%v", tc.Arguments),
+			})
+		}
+	case last.Role == agent.RoleTool:
+		h.onEvent(tui.StreamEvent{Type: "tool_result", Content: last.Content})
+	case last.Role == agent.RoleAssistant && last.Content != "":
+		h.onEvent(tui.StreamEvent{Type: "answer", Content: last.Content})
+	}
+}
+func (h *tuiStreamHook) OnRetry(_ context.Context, _ string, _ int, _ error) {}
+
+// ── LLM ─────────────────────────────────────────────────────────────────────
 
 func buildLLM() agent.LLMModel {
 	config := findConfig()
@@ -293,15 +452,21 @@ func findConfig() string {
 	return "conf/llmgate.toml"
 }
 
-// ── Tools ──────────────────────────────────────────────────────────────────────
+// ── Tools ───────────────────────────────────────────────────────────────────
+
+func buildToolRegistry(wsRoot string) *tool.ToolRegistry {
+	reg := tool.NewToolRegistry()
+	reg.Register(&builtin.CalculatorTool{})
+	reg.Register(&builtin.FileTool{WorkspaceRoot: wsRoot})
+	reg.Register(&builtin.ShellTool{WorkspaceRoot: wsRoot, MaxRuntime: 120 * time.Second})
+	reg.Register(&builtin.GitTool{WorkspaceRoot: wsRoot})
+	reg.Register(&builtin.WebSearchTool{})
+	reg.Register(&builtin.WebFetchTool{})
+	return reg
+}
 
 func buildTools(wsRoot string) []agent.Tool {
-	return []agent.Tool{
-		&builtin.CalculatorTool{},
-		&builtin.FileTool{WorkspaceRoot: wsRoot},
-		&builtin.ShellTool{WorkspaceRoot: wsRoot, MaxRuntime: 120 * time.Second},
-		&builtin.GitTool{WorkspaceRoot: wsRoot},
-	}
+	return buildToolRegistry(wsRoot).List()
 }
 
 func buildSystemPrompt(wsRoot string) string {
@@ -330,7 +495,7 @@ Guidelines:
 - Think broadly — you are not limited to code. You can write, analyze, research, create, and compute.`, wsRoot, hostname)
 }
 
-// ── CLI Hook ───────────────────────────────────────────────────────────────────
+// ── CLI Hook ────────────────────────────────────────────────────────────────
 
 type cliHook struct{ verbose bool }
 
@@ -359,7 +524,7 @@ func (h *cliHook) OnNodeEnd(_ context.Context, _ string, s *agent.MessageState, 
 }
 func (h *cliHook) OnRetry(_ context.Context, _ string, _ int, _ error) {}
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 func usage() {
 	fmt.Fprintf(os.Stderr, `Baize — Unified AI Agent Platform

@@ -1,0 +1,64 @@
+package tui
+
+import (
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// ── Streaming integration ──────────────────────────────────────────────────
+
+// startAgent returns a tea.Cmd that runs the agent and feeds streamEvent
+// messages back into the Bubble Tea event loop.
+func (m *Model) startAgent() tea.Cmd {
+	text := m.input.String()
+	if text == "" {
+		return nil
+	}
+
+	// Create a channel for events.
+	ch := make(chan tea.Msg, 64)
+
+	go func() {
+		defer close(ch)
+
+		m.runner.RunStream(m.ctx, text, func(ev StreamEvent) {
+			select {
+			case ch <- streamEvent{
+				Type:     ev.Type,
+				Content:  ev.Content,
+				ToolName: ev.ToolName,
+				Tokens:   ev.Tokens,
+			}:
+			case <-m.ctx.Done():
+				return
+			}
+		})
+	}()
+
+	return waitForEvent(ch)
+}
+
+// waitForEvent returns a Cmd that reads the next message from a channel.
+func waitForEvent(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return streamDone{Content: ""}
+		}
+		return msg
+	}
+}
+
+// ── Permission integration ─────────────────────────────────────────────────
+
+// requestPermission sends a permission confirmation request to the UI.
+func (m *Model) requestPermission(tool, question string) tea.Cmd {
+	ch := make(chan bool, 1)
+	return func() tea.Msg {
+		return permissionMsg{
+			Tool:      tool,
+			Question:  question,
+			Confirmed: ch,
+		}
+	}
+}
+

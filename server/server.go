@@ -1,42 +1,56 @@
-// Package server provides the HTTP + SSE API server for the
-// Baize agent platform. It exposes agent execution, session management,
-// and serves the AGUI web interface.
+// Package server provides the HTTP + SSE API server for the Baize agent platform.
 package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/wzhongyou/baize/agent"
-	"github.com/wzhongyou/baize/server/middleware"
+	"github.com/wzhongyou/baize/api"
 	"github.com/wzhongyou/baize/session"
 )
 
 // Server is the Baize API server.
 type Server struct {
-	http     *http.Server
-	agent    AgentRunner
-	sessions *session.Store
+	http       *http.Server
+	agent      AgentRunner
+	sessions   *session.Store
+	tools      api.ToolProvider
+	memory     api.MemoryProvider
 }
 
-// AgentRunner is the interface for executing agent tasks.
+// AgentRunner executes agent tasks. Implementations wrap the orchestrator.
 type AgentRunner interface {
-	Run(ctx context.Context, state *agent.MessageState) (*agent.MessageState, error)
-	RunStream(ctx context.Context, state *agent.MessageState, onEvent func(StreamEvent))
+	Run(ctx context.Context, req AgentRunRequest) (*AgentRunResult, error)
+	RunStream(ctx context.Context, req AgentRunRequest, onEvent func(StreamEvent))
 }
 
-// StreamEvent is a single event during agent execution.
+// AgentRunRequest is the input for an agent run.
+type AgentRunRequest struct {
+	SessionID string
+	Message   string
+	Provider  string
+	Model     string
+	MaxSteps  int
+}
+
+// AgentRunResult is the final output of an agent run.
+type AgentRunResult struct {
+	Content string
+	Tokens  int
+	Steps   int
+}
+
+// StreamEvent is a single event emitted during agent execution.
 type StreamEvent struct {
-	Type     string `json:"type"` // "thought", "tool_call", "tool_result", "answer", "done"
-	Content  string `json:"content,omitempty"`
-	ToolName string `json:"tool_name,omitempty"`
-	Tokens   int    `json:"tokens,omitempty"`
+	Type     string         `json:"type"` // "thought", "tool_call", "tool_result", "answer", "done"
+	Content  string         `json:"content,omitempty"`
+	ToolName string         `json:"tool_name,omitempty"`
+	ToolArgs map[string]any `json:"tool_args,omitempty"`
+	Tokens   int            `json:"tokens,omitempty"`
 }
 
 // Config holds server configuration.
@@ -56,7 +70,7 @@ func DefaultConfig() Config {
 }
 
 // New creates a new Baize API server.
-func New(runner AgentRunner, cfg Config) (*Server, error) {
+func New(runner AgentRunner, cfg Config, opts ...Option) (*Server, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0700); err != nil {
 		return nil, fmt.Errorf("server: data dir: %w", err)
 	}
@@ -71,38 +85,13 @@ func New(runner AgentRunner, cfg Config) (*Server, error) {
 		sessions: store,
 	}
 
-	mux := http.NewServeMux()
-
-	// ── AGUI static files ─────────────────────────────────────────────────
-	aguiDir := "web/dist"
-	if _, err := os.Stat(aguiDir); err == nil {
-		mux.Handle("/", http.FileServer(http.Dir(aguiDir)))
-		log.Printf("AGUI static files: %s", aguiDir)
-	} else {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/" {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.Write([]byte(aguiPlaceholder))
-				return
-			}
-			http.NotFound(w, r)
-		})
+	for _, opt := range opts {
+		opt(s)
 	}
-
-	// ── API endpoints ─────────────────────────────────────────────────────
-	mux.HandleFunc("/api/health", s.handleHealth)
-	mux.HandleFunc("/api/agent/chat", s.handleAgentChat)
-	mux.HandleFunc("/api/sessions", s.handleSessionsList)
-	mux.HandleFunc("/api/sessions/", s.handleSessionByID)
-
-	// ── Middleware ─────────────────────────────────────────────────────────
-	var handler http.Handler = mux
-	handler = middleware.CORS(handler)
-	handler = middleware.Logging(handler)
 
 	s.http = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		Handler:      handler,
+		Handler:      s.routes(),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 10 * time.Minute,
 		IdleTimeout:  120 * time.Second,
@@ -111,9 +100,23 @@ func New(runner AgentRunner, cfg Config) (*Server, error) {
 	return s, nil
 }
 
+// Option is a functional option for Server configuration.
+type Option func(*Server)
+
+// WithTools injects a tool provider.
+func WithTools(tp api.ToolProvider) Option {
+	return func(s *Server) { s.tools = tp }
+}
+
+// WithMemory injects a memory provider.
+func WithMemory(mp api.MemoryProvider) Option {
+	return func(s *Server) { s.memory = mp }
+}
+
 // Start begins listening and blocks.
 func (s *Server) Start() error {
-	log.Printf("AGUI: http://%s", s.http.Addr)
+	log.Printf("Baize API: http://%s", s.http.Addr)
+	log.Printf("Health:   http://%s/api/v1/health", s.http.Addr)
 	return s.http.ListenAndServe()
 }
 
@@ -121,199 +124,3 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.http.Shutdown(ctx)
 }
-
-// ── Handlers ──────────────────────────────────────────────────────────────────
-
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "ok",
-		"version": "0.3.0",
-	})
-}
-
-func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	var req struct {
-		SessionID string `json:"session_id"`
-		Message   string `json:"message"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.Message == "" {
-		writeError(w, http.StatusBadRequest, "message is required")
-		return
-	}
-
-	// ── SSE streaming ───────────────────────────────────────────────────
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-
-	sendSSE := func(event StreamEvent) {
-		data, _ := json.Marshal(event)
-		fmt.Fprintf(w, "data: %s\n\n", data)
-		flusher.Flush()
-	}
-
-	// Get or create session.
-	sessionID := req.SessionID
-	if sessionID == "" {
-		sessionID = fmt.Sprintf("sess-%d", time.Now().UnixNano())
-		title := req.Message
-		if len(title) > 50 {
-			title = title[:50] + "..."
-		}
-		s.sessions.CreateSession(&session.Session{
-			ID:    sessionID,
-			Title: title,
-		})
-	}
-
-	// Build message state.
-	messages := []agent.Message{}
-	if sess, err := s.sessions.GetSession(sessionID); err == nil {
-		messages = sess.Messages
-	}
-	userMsg := agent.Message{Role: agent.RoleUser, Content: req.Message}
-	s.sessions.AddMessage(sessionID, userMsg)
-	messages = append(messages, userMsg)
-
-	// Collect assistant response for saving.
-	var assistantContent strings.Builder
-
-	s.agent.RunStream(r.Context(), &agent.MessageState{
-		Messages: messages,
-		MaxSteps: 30,
-	}, func(ev StreamEvent) {
-		switch ev.Type {
-		case "answer":
-			assistantContent.WriteString(ev.Content)
-		case "done":
-			if assistantContent.Len() > 0 {
-				s.sessions.AddMessage(sessionID, agent.Message{
-					Role:    agent.RoleAssistant,
-					Content: assistantContent.String(),
-				})
-			}
-		}
-		sendSSE(ev)
-	})
-}
-
-func (s *Server) handleSessionsList(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		sessions, err := s.sessions.ListSessions()
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		type item struct {
-			ID        string `json:"id"`
-			Title     string `json:"title"`
-			CreatedAt string `json:"created_at"`
-		}
-		items := make([]item, 0, len(sessions))
-		for _, sess := range sessions {
-			items = append(items, item{
-				ID:        sess.ID,
-				Title:     sess.Title,
-				CreatedAt: sess.CreatedAt.Format(time.RFC3339),
-			})
-		}
-		if items == nil {
-			items = []item{}
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"sessions": items})
-
-	case http.MethodPost:
-		var req struct {
-			Title     string `json:"title"`
-			Workspace string `json:"workspace"`
-		}
-		json.NewDecoder(r.Body).Decode(&req)
-		id := fmt.Sprintf("sess-%d", time.Now().UnixNano())
-		s.sessions.CreateSession(&session.Session{
-			ID:            id,
-			Title:         req.Title,
-			WorkspaceRoot: req.Workspace,
-		})
-		writeJSON(w, http.StatusCreated, map[string]string{"id": id})
-
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
-func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/api/sessions/")
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "session id required")
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		sess, err := s.sessions.GetSession(id)
-		if err != nil {
-			writeError(w, http.StatusNotFound, "session not found")
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"session": map[string]any{
-				"id":         sess.ID,
-				"title":      sess.Title,
-				"created_at": sess.CreatedAt.Format(time.RFC3339),
-			},
-			"messages": sess.Messages,
-		})
-	case http.MethodDelete:
-		s.sessions.DeleteSession(id)
-		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
-}
-
-const aguiPlaceholder = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head><meta charset="UTF-8"><title>Baize AGUI</title></head>
-<body style="font-family:system-ui;max-width:800px;margin:80px auto;padding:20px;background:#0f172a;color:#e2e8f0">
-<h1>Baize AGUI</h1>
-<p>AGUI Web 前端尚未构建。请执行以下步骤：</p>
-<pre style="background:#1e293b;padding:16px;border-radius:8px;color:#94a3b8">
-cd web
-npm install
-npm run build
-</pre>
-<p>之后重启 <code>baize server</code> 即可访问完整界面。</p>
-<p style="color:#64748b;margin-top:40px">API 端点可用：<br>
-GET  /api/health<br>
-POST /api/agent/chat<br>
-GET  /api/sessions</p>
-</body></html>`
