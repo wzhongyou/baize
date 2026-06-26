@@ -2,7 +2,7 @@
 
 > 白泽，神兽也，达于万物，知其名、识其形、通其道。
 
-Baize 是开源的全栈 AI 编码助手 —— 对标 Claude Code。Go 引擎 + 多端客户端，单二进制分发。
+Baize 是开源的全栈 AI 编码助手。Go 引擎 + 多端客户端，单二进制分发。
 
 **CLI · TUI · VSCode · JetBrains · Web Dashboard**
 
