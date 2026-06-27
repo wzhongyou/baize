@@ -28,6 +28,14 @@ func (a *agentPermAdapter) CheckPermission(ctx context.Context, toolName string,
 
 	st, isSafe := t.(tool.SafeTool)
 
+	// For file tool, derive actual permissions from the action argument
+	// so that read/list/search don't trigger write-permission checks.
+	if isSafe {
+		if action, hasAction := args["action"].(string); hasAction {
+			st = actionScopedSafeTool{SafeTool: st, action: action}
+		}
+	}
+
 	// If the tool doesn't declare permissions, allow by default.
 	if !isSafe {
 		return "allow", ""
@@ -84,6 +92,23 @@ func buildOperation(p Permission, toolName string, st tool.SafeTool, args map[st
 	}
 
 	return op
+}
+
+// actionScopedSafeTool narrows SafeTool permissions based on the action argument.
+// For file tools, read/list/search only need PermFileRead.
+type actionScopedSafeTool struct {
+	tool.SafeTool
+	action string
+}
+
+var readOnlyFileActions = map[string]bool{"read": true, "list": true, "search": true}
+
+func (a actionScopedSafeTool) IsReadOnly() bool { return readOnlyFileActions[a.action] }
+func (a actionScopedSafeTool) RequiredPermissions() []tool.Permission {
+	if readOnlyFileActions[a.action] {
+		return []tool.Permission{tool.PermFileRead}
+	}
+	return a.SafeTool.RequiredPermissions()
 }
 
 // AsAgentCheckerFullAuto wraps PolicyEngine as a checker that never asks —

@@ -73,6 +73,23 @@ func (f *FileTool) AffectedPaths(args map[string]any) []string {
 	return nil
 }
 
+// readOnlyActions are file operations that don't modify the filesystem.
+var readOnlyActions = map[string]bool{"read": true, "list": true, "search": true}
+
+// safeFileTool wraps FileTool to expose per-action SafeTool metadata.
+type safeFileToolAction struct {
+	*FileTool
+	action string
+}
+
+func (s *safeFileToolAction) IsReadOnly() bool { return readOnlyActions[s.action] }
+func (s *safeFileToolAction) RequiredPermissions() []tool.Permission {
+	if readOnlyActions[s.action] {
+		return []tool.Permission{tool.PermFileRead}
+	}
+	return []tool.Permission{tool.PermFileWrite}
+}
+
 func (f *FileTool) Execute(ctx context.Context, args map[string]any) (string, error) {
 	action, _ := args["action"].(string)
 	path, _ := args["path"].(string)

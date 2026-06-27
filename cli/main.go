@@ -22,17 +22,18 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/wzhongyou/baize/cli/tui"
 	"github.com/wzhongyou/baize/core/agent"
 	llmgateadapter "github.com/wzhongyou/baize/core/agent/llmgate"
 	baizecontext "github.com/wzhongyou/baize/core/context"
 	"github.com/wzhongyou/baize/core/memory"
 	"github.com/wzhongyou/baize/core/permission"
+	"github.com/wzhongyou/baize/core/skill"
+	"github.com/wzhongyou/baize/core/tool"
+	"github.com/wzhongyou/baize/core/tool/builtin"
 	"github.com/wzhongyou/baize/internal/version"
 	"github.com/wzhongyou/baize/protocol"
 	"github.com/wzhongyou/baize/server"
-	"github.com/wzhongyou/baize/core/tool"
-	"github.com/wzhongyou/baize/core/tool/builtin"
-	"github.com/wzhongyou/baize/cli/tui"
 	"github.com/wzhongyou/weave/graph"
 	"github.com/wzhongyou/llmgate/sdk"
 )
@@ -77,7 +78,10 @@ func main() {
 		log.Fatalf("Invalid workspace: %v", err)
 	}
 
-	reg := buildToolRegistry(wsRoot)
+	sm := buildSkillManager(ctx)
+	defer sm.Close()
+
+	reg := buildToolRegistry(wsRoot, sm)
 	tools := reg.List()
 	permChecker, policyEngine := buildPermChecker(reg, wsRoot)
 	question := flag.Arg(0)
@@ -87,6 +91,7 @@ func main() {
 			wsRoot, orDefault(*provider, "auto"), orDefault(*modelName, "default"))
 	}
 
+	sysPrompt := buildSystemPrompt(wsRoot, sm)
 	if question != "" {
 		runSingleShot(ctx, llm, tools, permChecker, wsRoot, question)
 	} else if *noTui {
@@ -94,6 +99,7 @@ func main() {
 	} else {
 		runTUI(llm, tools, permChecker, policyEngine, wsRoot)
 	}
+	_ = sysPrompt
 }
 
 // ── Permission ──────────────────────────────────────────────────────────────
@@ -119,14 +125,19 @@ func runServer() {
 	if llm == nil {
 		log.Fatal("No LLM configured. Set up conf/llmgate.toml.")
 	}
+	ctx := context.Background()
 	wsRoot, _ := filepath.Abs(*workspace)
-	reg := buildToolRegistry(wsRoot)
+
+	sm := buildSkillManager(ctx)
+	defer sm.Close()
+
+	reg := buildToolRegistry(wsRoot, sm)
 	tools := reg.List()
 
 	runner := &agentRunner{
 		llm:         llm,
 		tools:       tools,
-		sysPrompt:   buildSystemPrompt(wsRoot),
+		sysPrompt:   buildSystemPrompt(wsRoot, sm),
 		maxSteps:    *maxSteps,
 		permChecker: func() agent.PermissionChecker { pc, _ := buildPermChecker(reg, wsRoot); return pc }(),
 	}
@@ -305,7 +316,7 @@ func runSingleShot(ctx context.Context, llm agent.LLMModel, tools []agent.Tool, 
 	ag := agent.NewReActAgent(agent.ReActAgentConfig{
 		Name:         "baize",
 		LLM:          llm,
-		SystemPrompt: buildSystemPrompt(wsRoot),
+		SystemPrompt: buildSystemPrompt(wsRoot, nil),
 		Tools:        tools,
 		MaxSteps:     *maxSteps,
 		PermChecker:  permChecker,
@@ -368,7 +379,7 @@ func runTUI(llm agent.LLMModel, tools []agent.Tool, permChecker agent.Permission
 		llm:         llm,
 		tools:       tools,
 		permChecker: permChecker,
-		sysPrompt:   buildSystemPrompt(wsRoot),
+		sysPrompt:   buildSystemPrompt(wsRoot, nil),
 		maxSteps:    *maxSteps,
 	}
 
@@ -535,7 +546,16 @@ func findConfig() string {
 
 // ── Tools ───────────────────────────────────────────────────────────────────
 
-func buildToolRegistry(wsRoot string) *tool.ToolRegistry {
+func buildSkillManager(ctx context.Context) *skill.Manager {
+	home, _ := os.UserHomeDir()
+	skillsDir := filepath.Join(home, ".baize", "skills")
+	sm := skill.NewManager(skillsDir)
+	_ = sm.Load(skillsDir)
+	_ = sm.Start(ctx)
+	return sm
+}
+
+func buildToolRegistry(wsRoot string, sm *skill.Manager) *tool.ToolRegistry {
 	reg := tool.NewToolRegistry()
 	reg.Register(&builtin.CalculatorTool{})
 	reg.Register(&builtin.FileTool{WorkspaceRoot: wsRoot})
@@ -551,6 +571,12 @@ func buildToolRegistry(wsRoot string) *tool.ToolRegistry {
 	if am, err := memory.NewAutoMemory(memDir); err == nil {
 		reg.Register(&builtin.MemorySaveTool{AutoMemory: am})
 	}
+
+	// Register tools from skill MCP servers + the activate_skill tool.
+	for _, t := range sm.Tools() {
+		reg.Register(t)
+	}
+
 	return reg
 }
 
@@ -564,10 +590,11 @@ func slugifyPath(p string) string {
 }
 
 func buildTools(wsRoot string) []agent.Tool {
-	return buildToolRegistry(wsRoot).List()
+	sm := buildSkillManager(context.Background())
+	return buildToolRegistry(wsRoot, sm).List()
 }
 
-func buildSystemPrompt(wsRoot string) string {
+func buildSystemPrompt(wsRoot string, sm *skill.Manager) string {
 	hostname, _ := os.Hostname()
 	base := fmt.Sprintf(`你是白泽（Baize），一名专为软件工程师打造的 AI 编程助手。
 
@@ -599,6 +626,14 @@ func buildSystemPrompt(wsRoot string) string {
 	if instructions := loader.Load(); instructions != "" {
 		base += "\n\n== 项目指令 ==\n" + instructions
 	}
+
+	// Append skill index (name+description only) from the passed manager.
+	if sm != nil {
+		if idx := sm.SystemPromptIndex(); idx != "" {
+			base += "\n\n" + idx
+		}
+	}
+
 	return base
 }
 

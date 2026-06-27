@@ -189,10 +189,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Other keys: forward to textarea
+		// Forward to textarea, then recalculate viewport height for hint line.
 		if m.mode == modeInput {
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(msg)
+			// Shrink viewport by 1 when hint is visible to avoid layout shift.
+			inputText := m.textarea.Value()
+			if strings.HasPrefix(inputText, "/") && filteredCommands(inputText) != "" {
+				m.viewport.Height = m.height - 4
+			} else {
+				m.viewport.Height = m.height - 3
+			}
 			return m, cmd
 		}
 
@@ -253,7 +260,14 @@ func (m *Model) View() string {
 
 	input := ""
 	if m.mode == modeInput {
-		input = m.textarea.View()
+		inputText := m.textarea.Value()
+		hint := ""
+		if strings.HasPrefix(inputText, "/") {
+			if cmds := filteredCommands(inputText); cmds != "" {
+				hint = mutedStyle.Render("  " + cmds) + "\n"
+			}
+		}
+		input = hint + m.textarea.View()
 	} else {
 		input = mutedStyle.Render("  思考中...")
 	}

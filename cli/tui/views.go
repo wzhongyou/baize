@@ -62,7 +62,7 @@ func (m *Model) chatView() string {
 				}
 				sb.WriteString("\n")
 				if tc.Result != "" {
-					sb.WriteString(toolResultStyle.Render(truncate(tc.Result, 500)) + "\n")
+					sb.WriteString(toolResultStyle.Render(truncateResult(tc.Result, 2000)) + "\n")
 				}
 				if tc.Error != "" {
 					sb.WriteString(errorStyle.Render("  ✗ "+tc.Error) + "\n")
@@ -127,6 +127,14 @@ func (m *Model) confirmView() string {
 
 func truncate(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) > maxLen {
+		return s[:maxLen] + "…"
+	}
+	return s
+}
+
+// truncateResult preserves newlines for multi-line tool output (file listings, grep results).
+func truncateResult(s string, maxLen int) string {
 	if len(s) > maxLen {
 		return s[:maxLen] + "…"
 	}
