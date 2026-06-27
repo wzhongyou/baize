@@ -7,7 +7,7 @@ All notable changes to Baize will be documented in this file.
 ### Added
 - System prompt rewritten for universal super-agent identity (was: software engineering assistant)
 - English README with SEO-optimized keywords
-- 15-dimension competitive analysis matrix (vs Manus/GenSpark/OpenClaw/Codex/CoWork)
+- 15-dimension competitive analysis matrix (landscape survey)
 - Short-term + long-term upgrade roadmap
 
 ### Changed
@@ -15,14 +15,11 @@ All notable changes to Baize will be documented in this file.
 - Binary: cj → baize
 - CLI directory: cmd/cj/ → cmd/baize/
 - Config path: .cangjie/ → .baize/
-- Web UI branding: Cangjie AGUI → Baize AGUI
-- Chat width: 820px → 1024px (max-w-5xl)
 - Module path: github.com/wzhongyou/cangjie → github.com/wzhongyou/baize
 
 ### Fixed
 - All 23 Go files import paths updated
 - All documentation references renamed
-- Web frontend branding strings
 - Binary naming consistency
 
 ---
@@ -37,8 +34,7 @@ All notable changes to Baize will be documented in this file.
 - Short-term memory + Long-term memory with Vector Store
 - Calculator / File / Shell / Git built-in tools
 - CLI/TUI entry point (Bubble Tea framework)
-- Web Dashboard (React + TypeScript + Tailwind)
-- API Server (HTTP + WebSocket + gRPC)
+- API Server (HTTP + SSE)
 - Session management with persistence
 - Graph execution engine (via Graphflow)
 - 5 example programs (agent_demo, streaming, supervisor, mcp, structured_output)

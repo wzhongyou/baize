@@ -2,10 +2,6 @@
 
 感谢你对 Baize（白泽）的关注！无论是 Bug 修复、功能提案、文档改进还是使用反馈，都欢迎参与。
 
-## 行为准则
-
-本项目遵循 [Contributor Covenant 行为准则](CODE_OF_CONDUCT.md)。
-
 ## 如何贡献
 
 ### 报告 Bug
@@ -67,27 +63,28 @@ chore:    构建/工具
 ```bash
 # 依赖
 Go >= 1.25
-Node.js >= 20（Web Dashboard 开发）
 
 # 构建
 make build
 
 # 运行
 ./baize
-
-# Web Dashboard 开发
-cd web && npm install && npm run dev
 ```
 
 ## 项目结构
 
 ```
 baize/
-├── agent/       # Agent 核心抽象
-├── tool/        # 工具系统
+├── cli/         # CLI 入口 + TUI
+├── core/        # AI 引擎
+│   ├── agent/   # Agent 核心抽象
+│   ├── tool/    # 工具系统
+│   ├── permission/
+│   ├── session/
+│   ├── memory/
+│   └── context/
 ├── server/      # API Server
-├── web/         # Web Dashboard (React)
-├── cmd/baize/   # CLI 入口
+├── protocol/    # 智能体会话协议
 └── docs/        # 文档
 ```
 

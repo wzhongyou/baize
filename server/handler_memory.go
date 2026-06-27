@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/wzhongyou/baize/api"
+	"github.com/wzhongyou/baize/protocol"
 	"github.com/wzhongyou/baize/server/middleware"
 )
 
@@ -13,17 +13,17 @@ func (s *Server) handleMemorySearch(w http.ResponseWriter, r *http.Request) {
 	reqID := middleware.GetRequestID(r.Context())
 
 	if r.Method != http.MethodPost {
-		api.WriteError(w, reqID, http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, reqID, http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 		return
 	}
 
-	var req api.MemorySearchRequest
+	var req protocol.MemorySearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "invalid request body")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "invalid request body")
 		return
 	}
 	if req.Query == "" {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "query is required")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "query is required")
 		return
 	}
 	if req.TopK <= 0 {
@@ -31,57 +31,57 @@ func (s *Server) handleMemorySearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.memory == nil {
-		api.WriteSuccess(w, reqID, api.MemorySearchResponse{Results: []api.MemorySearchResult{}})
+		protocol.WriteSuccess(w, reqID, protocol.MemorySearchResponse{Results: []protocol.MemorySearchResult{}})
 		return
 	}
 
 	results, err := s.memory.Search(context.Background(), req.Query, req.TopK)
 	if err != nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeInternalError, err.Error())
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeInternalError, err.Error())
 		return
 	}
 
-	out := make([]api.MemorySearchResult, 0, len(results))
+	out := make([]protocol.MemorySearchResult, 0, len(results))
 	for _, r := range results {
-		out = append(out, api.MemorySearchResult{
+		out = append(out, protocol.MemorySearchResult{
 			Content:  r.Content,
 			Score:    r.Score,
 			Metadata: r.Metadata,
 		})
 	}
 	if out == nil {
-		out = []api.MemorySearchResult{}
+		out = []protocol.MemorySearchResult{}
 	}
-	api.WriteSuccess(w, reqID, api.MemorySearchResponse{Results: out})
+	protocol.WriteSuccess(w, reqID, protocol.MemorySearchResponse{Results: out})
 }
 
 func (s *Server) handleMemorySave(w http.ResponseWriter, r *http.Request) {
 	reqID := middleware.GetRequestID(r.Context())
 
 	if r.Method != http.MethodPost {
-		api.WriteError(w, reqID, http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, reqID, http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 		return
 	}
 
-	var req api.MemorySaveRequest
+	var req protocol.MemorySaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "invalid request body")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "invalid request body")
 		return
 	}
 	if req.Content == "" {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "content is required")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "content is required")
 		return
 	}
 
 	if s.memory == nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeInternalError, "memory not configured")
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeInternalError, "memory not configured")
 		return
 	}
 
 	if err := s.memory.Save(context.Background(), req.Content, req.Metadata); err != nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeInternalError, err.Error())
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeInternalError, err.Error())
 		return
 	}
 
-	api.WriteSuccess(w, reqID, map[string]string{"status": "saved"})
+	protocol.WriteSuccess(w, reqID, map[string]string{"status": "saved"})
 }

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wzhongyou/baize/api"
+	"github.com/wzhongyou/baize/protocol"
 	"github.com/wzhongyou/baize/server/middleware"
-	"github.com/wzhongyou/baize/session"
+	"github.com/wzhongyou/baize/core/session"
 )
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
@@ -20,20 +20,20 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		s.createSession(w, r, reqID)
 	default:
-		api.WriteError(w, reqID, http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, reqID, http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 	}
 }
 
 func (s *Server) listSessions(w http.ResponseWriter, reqID string) {
 	sessions, err := s.sessions.ListSessions()
 	if err != nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeInternalError, err.Error())
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeInternalError, err.Error())
 		return
 	}
 
-	items := make([]api.SessionInfo, 0, len(sessions))
+	items := make([]protocol.SessionInfo, 0, len(sessions))
 	for _, sess := range sessions {
-		items = append(items, api.SessionInfo{
+		items = append(items, protocol.SessionInfo{
 			ID:            sess.ID,
 			Title:         sess.Title,
 			WorkspaceRoot: sess.WorkspaceRoot,
@@ -46,16 +46,16 @@ func (s *Server) listSessions(w http.ResponseWriter, reqID string) {
 		})
 	}
 	if items == nil {
-		items = []api.SessionInfo{}
+		items = []protocol.SessionInfo{}
 	}
 
-	api.WriteSuccess(w, reqID, map[string]any{"sessions": items})
+	protocol.WriteSuccess(w, reqID, map[string]any{"sessions": items})
 }
 
 func (s *Server) createSession(w http.ResponseWriter, r *http.Request, reqID string) {
-	var req api.CreateSessionRequest
+	var req protocol.CreateSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "invalid request body")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "invalid request body")
 		return
 	}
 
@@ -65,18 +65,18 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request, reqID str
 		Title:         req.Title,
 		WorkspaceRoot: req.WorkspaceRoot,
 	}); err != nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeInternalError, err.Error())
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeInternalError, err.Error())
 		return
 	}
 
-	api.WriteCreated(w, reqID, map[string]string{"id": id})
+	protocol.WriteCreated(w, reqID, map[string]string{"id": id})
 }
 
 func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 	reqID := middleware.GetRequestID(r.Context())
 	id := extractID(r.URL.Path, "/api/v1/sessions/")
 	if id == "" {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "session id required")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "session id required")
 		return
 	}
 
@@ -86,27 +86,27 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		s.deleteSession(w, reqID, id)
 	default:
-		api.WriteError(w, reqID, http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, reqID, http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 	}
 }
 
 func (s *Server) getSession(w http.ResponseWriter, reqID, id string) {
 	sess, err := s.sessions.GetSession(id)
 	if err != nil {
-		api.WriteError(w, reqID, http.StatusNotFound, api.CodeNotFound, "session not found")
+		protocol.WriteError(w, reqID, http.StatusNotFound, protocol.CodeNotFound, "session not found")
 		return
 	}
 
-	msgs := make([]api.Message, 0, len(sess.Messages))
+	msgs := make([]protocol.Message, 0, len(sess.Messages))
 	for _, m := range sess.Messages {
-		apiMsg := api.Message{
+		apiMsg := protocol.Message{
 			Role:      string(m.Role),
 			Content:   m.Content,
 			ToolName:  m.ToolName,
 			Timestamp: m.Timestamp,
 		}
 		for _, tc := range m.ToolCalls {
-			apiMsg.ToolCalls = append(apiMsg.ToolCalls, api.ToolCall{
+			apiMsg.ToolCalls = append(apiMsg.ToolCalls, protocol.ToolCall{
 				ID:        tc.ID,
 				Name:      tc.Name,
 				Arguments: tc.Arguments,
@@ -115,8 +115,8 @@ func (s *Server) getSession(w http.ResponseWriter, reqID, id string) {
 		msgs = append(msgs, apiMsg)
 	}
 
-	api.WriteSuccess(w, reqID, api.SessionDetail{
-		SessionInfo: api.SessionInfo{
+	protocol.WriteSuccess(w, reqID, protocol.SessionDetail{
+		SessionInfo: protocol.SessionInfo{
 			ID:            sess.ID,
 			Title:         sess.Title,
 			WorkspaceRoot: sess.WorkspaceRoot,
@@ -133,8 +133,8 @@ func (s *Server) getSession(w http.ResponseWriter, reqID, id string) {
 
 func (s *Server) deleteSession(w http.ResponseWriter, reqID, id string) {
 	if err := s.sessions.DeleteSession(id); err != nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeInternalError, err.Error())
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeInternalError, err.Error())
 		return
 	}
-	api.WriteSuccess(w, reqID, map[string]string{"status": "deleted"})
+	protocol.WriteSuccess(w, reqID, map[string]string{"status": "deleted"})
 }

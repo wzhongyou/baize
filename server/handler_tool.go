@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/wzhongyou/baize/api"
+	"github.com/wzhongyou/baize/protocol"
 	"github.com/wzhongyou/baize/server/middleware"
 )
 
@@ -13,50 +13,50 @@ func (s *Server) handleToolsList(w http.ResponseWriter, r *http.Request) {
 	reqID := middleware.GetRequestID(r.Context())
 
 	if r.Method != http.MethodPost {
-		api.WriteError(w, reqID, http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, reqID, http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 		return
 	}
 
 	if s.tools == nil {
-		api.WriteSuccess(w, reqID, api.ListToolsResponse{Tools: []api.ToolInfo{}})
+		protocol.WriteSuccess(w, reqID, protocol.ListToolsResponse{Tools: []protocol.ToolInfo{}})
 		return
 	}
 
 	infos := s.tools.ToolInfos()
 	if infos == nil {
-		infos = []api.ToolInfo{}
+		infos = []protocol.ToolInfo{}
 	}
-	api.WriteSuccess(w, reqID, api.ListToolsResponse{Tools: infos})
+	protocol.WriteSuccess(w, reqID, protocol.ListToolsResponse{Tools: infos})
 }
 
 func (s *Server) handleToolCall(w http.ResponseWriter, r *http.Request) {
 	reqID := middleware.GetRequestID(r.Context())
 
 	if r.Method != http.MethodPost {
-		api.WriteError(w, reqID, http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, reqID, http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 		return
 	}
 
-	var req api.CallToolRequest
+	var req protocol.CallToolRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "invalid request body")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "invalid request body")
 		return
 	}
 	if req.Name == "" {
-		api.WriteError(w, reqID, http.StatusBadRequest, api.CodeBadRequest, "tool name is required")
+		protocol.WriteError(w, reqID, http.StatusBadRequest, protocol.CodeBadRequest, "tool name is required")
 		return
 	}
 
 	if s.tools == nil {
-		api.WriteError(w, reqID, http.StatusNotFound, api.CodeNotFound, "no tools available")
+		protocol.WriteError(w, reqID, http.StatusNotFound, protocol.CodeNotFound, "no tools available")
 		return
 	}
 
 	result, err := s.tools.Execute(context.Background(), req.Name, req.Arguments)
 	if err != nil {
-		api.WriteError(w, reqID, http.StatusInternalServerError, api.CodeToolError, err.Error())
+		protocol.WriteError(w, reqID, http.StatusInternalServerError, protocol.CodeToolError, err.Error())
 		return
 	}
 
-	api.WriteSuccess(w, reqID, api.CallToolResponse{Content: result})
+	protocol.WriteSuccess(w, reqID, protocol.CallToolResponse{Content: result})
 }

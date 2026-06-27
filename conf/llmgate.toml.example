@@ -1,17 +1,19 @@
-# Graphflow LLM 配置文件
-# cp llmgate.toml.example llmgate.toml，然后填入你的 API key。
+# Baize 模型配置示例
+# 复制为 llmgate.toml，填入你的 API key。
 #
 # 两种配置方式：
 #   1. 直接写入 key：  key = "sk-xxx"
-#   2. 环境变量引用：  key = "${DEEPSEEK_KEY}"
+#   2. 环境变量引用：  key = "${DEEPSEEK_KEY}"  （推荐）
 #
-# 用真实模型运行 Agent Demo：
-#   go run ./examples/agent_demo/ -config config/llmgate.toml -model deepseek
+# 使用：
+#   export DEEPSEEK_KEY=sk-xxx
+#   ./baize
 
-# ── 供应商（取消注释你要用的那个） ─────────────────────────────
+# ── 供应商（取消注释你要用的） ─────────────────────────────
 [[providers]]
 name = "deepseek"
 key = "${DEEPSEEK_KEY}"
+# default_model = "deepseek-chat"      # 可选：指定默认模型
 
 # [[providers]]
 # name = "openai"
@@ -28,4 +30,4 @@ key = "${DEEPSEEK_KEY}"
 # ── 路由策略（可选） ──────────────────────────────────────────
 [strategy]
 primary = "deepseek"
-# fallback = ["glm", "minimax"]
+# fallback = ["glm"]

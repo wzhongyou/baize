@@ -1,11 +1,11 @@
-.PHONY: build run test lint vet clean install dev server web
+.PHONY: build run test lint vet clean install dev server
 
 BINARY := baize
 GOFLAGS := -ldflags="-s -w"
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 build: ## Build the binary
-	go build $(GOFLAGS) -o $(BINARY) ./cmd/baize/
+	go build $(GOFLAGS) -o $(BINARY) ./cli/
 
 run: build ## Build and run interactive mode
 	./$(BINARY)
@@ -14,7 +14,7 @@ server: build ## Build and run API server
 	./$(BINARY) server --port 9779
 
 install: ## Install to $GOPATH/bin
-	go install ./cmd/baize/
+	go install ./cli/
 
 test: ## Run all tests
 	go test -v -race -count=1 ./...
@@ -47,12 +47,6 @@ clean: ## Remove build artifacts
 dev: ## Start development (server + watch)
 	@echo "Starting Baize server on http://127.0.0.1:9779"
 	./$(BINARY) server --port 9779
-
-web-build: ## Build web dashboard
-	cd web && npm install && npm run build
-
-web-dev: ## Start web dashboard dev server
-	cd web && npm install && npm run dev
 
 all: fmt lint test build ## Format, lint, test, build
 

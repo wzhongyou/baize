@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/wzhongyou/baize/api"
-	"github.com/wzhongyou/baize/session"
+	"github.com/wzhongyou/baize/protocol"
+	"github.com/wzhongyou/baize/core/session"
 )
 
 // Server is the Baize API server.
@@ -18,8 +18,8 @@ type Server struct {
 	http       *http.Server
 	agent      AgentRunner
 	sessions   *session.Store
-	tools      api.ToolProvider
-	memory     api.MemoryProvider
+	tools      protocol.ToolProvider
+	memory     protocol.MemoryProvider
 }
 
 // AgentRunner executes agent tasks. Implementations wrap the orchestrator.
@@ -104,12 +104,12 @@ func New(runner AgentRunner, cfg Config, opts ...Option) (*Server, error) {
 type Option func(*Server)
 
 // WithTools injects a tool provider.
-func WithTools(tp api.ToolProvider) Option {
+func WithTools(tp protocol.ToolProvider) Option {
 	return func(s *Server) { s.tools = tp }
 }
 
 // WithMemory injects a memory provider.
-func WithMemory(mp api.MemoryProvider) Option {
+func WithMemory(mp protocol.MemoryProvider) Option {
 	return func(s *Server) { s.memory = mp }
 }
 

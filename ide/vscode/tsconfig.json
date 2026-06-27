@@ -1,10 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
+    "target": "ES2022",
+    "module": "commonjs",
     "outDir": "dist",
-    "jsx": "react-jsx"
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
-  "include": ["src"],
-  "references": [{ "path": "../../shared" }, { "path": "../../core" }]
+  "include": ["src"]
 }

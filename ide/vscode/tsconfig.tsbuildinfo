@@ -1,1 +1,0 @@
-{"root":["./src/extension.ts","./src/services/agent-service.ts","./src/webview/chat-panel.ts","./src/webview/diff-panel.ts"],"version":"6.0.3"}

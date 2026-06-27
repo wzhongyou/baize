@@ -7,25 +7,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wzhongyou/baize/agent"
-	"github.com/wzhongyou/baize/api"
+	"github.com/wzhongyou/baize/core/agent"
+	"github.com/wzhongyou/baize/protocol"
 	"github.com/wzhongyou/baize/server/middleware"
-	"github.com/wzhongyou/baize/session"
+	"github.com/wzhongyou/baize/core/session"
 )
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusMethodNotAllowed, api.CodeBadRequest, "method not allowed")
+		protocol.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusMethodNotAllowed, protocol.CodeBadRequest, "method not allowed")
 		return
 	}
 
-	var req api.ChatRequest
+	var req protocol.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusBadRequest, api.CodeBadRequest, "invalid request body")
+		protocol.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusBadRequest, protocol.CodeBadRequest, "invalid request body")
 		return
 	}
 	if req.Message == "" {
-		api.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusBadRequest, api.CodeBadRequest, "message is required")
+		protocol.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusBadRequest, protocol.CodeBadRequest, "message is required")
 		return
 	}
 	if req.MaxSteps <= 0 {
@@ -35,7 +35,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// Check streaming support.
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		api.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusInternalServerError, api.CodeInternalError, "streaming not supported")
+		protocol.WriteError(w, middleware.GetRequestID(r.Context()), http.StatusInternalServerError, protocol.CodeInternalError, "streaming not supported")
 		return
 	}
 
@@ -46,7 +46,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.Header().Set("X-Request-ID", middleware.GetRequestID(r.Context()))
 
-	sendSSE := func(event api.ChatEvent) {
+	sendSSE := func(event protocol.ChatEvent) {
 		data, _ := json.Marshal(event)
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
@@ -91,7 +91,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		MaxSteps:  req.MaxSteps,
 	}, func(ev StreamEvent) {
 		// Map to API event.
-		apiEvent := api.ChatEvent{
+		apiEvent := protocol.ChatEvent{
 			Type:     ev.Type,
 			Content:  ev.Content,
 			ToolName: ev.ToolName,
@@ -101,12 +101,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		sendSSE(apiEvent)
 
 		// Track assistant content for saving.
-		if ev.Type == api.EventAnswer {
+		if ev.Type == protocol.EventAnswer {
 			assistantContent.WriteString(ev.Content)
 		}
 
 		// Save assistant message on completion.
-		if ev.Type == api.EventDone {
+		if ev.Type == protocol.EventDone {
 			if assistantContent.Len() > 0 {
 				_ = s.sessions.AddMessage(sessionID, agent.Message{
 					Role:      agent.RoleAssistant,
