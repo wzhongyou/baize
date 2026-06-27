@@ -1,41 +1,29 @@
-# Changelog
+# 更新日志
 
-All notable changes to Baize will be documented in this file.
+## [0.4.0] - 2026-06-27
 
-## [Unreleased]
+### 变更
+- 升级 Graphflow v0.2.0 → Weave v0.4.0
+- 目录重组，CLI/TUI 独立交付
+- 移除竞品对标，聚焦 Baize 自身定位
+- 清理 README_EN、Graphflow 引用残留
 
-### Added
-- System prompt rewritten for universal super-agent identity (was: software engineering assistant)
-- English README with SEO-optimized keywords
-- 15-dimension competitive analysis matrix (landscape survey)
-- Short-term + long-term upgrade roadmap
-
-### Changed
-- Full brand rename: Cangjie → Baize (白泽)
-- Binary: cj → baize
-- CLI directory: cmd/cj/ → cmd/baize/
-- Config path: .cangjie/ → .baize/
-- Module path: github.com/wzhongyou/cangjie → github.com/wzhongyou/baize
-
-### Fixed
-- All 23 Go files import paths updated
-- All documentation references renamed
-- Binary naming consistency
+### 修复
+- CI 构建流程（Graphflow 依赖克隆、gitignore 锚定）
+- 文档与代码一致性
 
 ---
 
 ## [0.3.0] - 2026-06-06
 
-### Added
-- Agent core library: ReAct / RAG / Supervisor Agent patterns
-- MCP (Model Context Protocol) client implementation
-- LLM gateway integration with multi-model support
-- Structured output (JSON Schema) with validation
-- Short-term memory + Long-term memory with Vector Store
-- Calculator / File / Shell / Git built-in tools
-- CLI/TUI entry point (Bubble Tea framework)
-- API Server (HTTP + SSE)
-- Session management with persistence
-- Graph execution engine (via Graphflow)
-- 5 example programs (agent_demo, streaming, supervisor, mcp, structured_output)
-- 40 unit tests across agent/llmgate/permission/tool packages
+### 新增
+- 品牌更名：仓颉 → 白泽（Baize）
+- 系统提示词重写为通用超级智能体
+- Agent 核心库：ReAct / RAG / Supervisor 模式
+- MCP 客户端、LLM 网关（多模型支持）
+- 结构化输出（JSON Schema + 校验）
+- 短期/长期记忆（向量存储）
+- 内置工具：计算器 / 文件 / Shell / Git
+- CLI/TUI 入口（Bubble Tea）、API Server（HTTP + SSE）
+- 会话管理（持久化）、图执行引擎（Graphflow）
+- 5 示例 + 40 单元测试
