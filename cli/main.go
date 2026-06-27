@@ -26,6 +26,7 @@ import (
 	baizecontext "github.com/wzhongyou/baize/core/context"
 	"github.com/wzhongyou/baize/core/memory"
 	"github.com/wzhongyou/baize/core/permission"
+	"github.com/wzhongyou/baize/internal/version"
 	"github.com/wzhongyou/baize/server"
 	"github.com/wzhongyou/baize/core/tool"
 	"github.com/wzhongyou/baize/core/tool/builtin"
@@ -41,6 +42,7 @@ var (
 	workspace  = flag.String("workspace", ".", "Workspace root directory")
 	maxSteps   = flag.Int("max-steps", 30, "Maximum agent execution steps")
 	verbose    = flag.Bool("verbose", false, "Enable verbose output")
+	mode       = flag.String("mode", "auto-edit", "Permission mode: suggest | auto-edit | full-auto")
 
 	// TUI / Server flags.
 	noTui      = flag.Bool("no-tui", false, "Disable Bubble Tea TUI (use simple REPL)")
@@ -96,7 +98,16 @@ func main() {
 
 func buildPermChecker(reg *tool.ToolRegistry, wsRoot string) (agent.PermissionChecker, *permission.PolicyEngine) {
 	pe := permission.NewPolicyEngine(permission.DefaultPolicy(wsRoot))
-	return pe.AsAgentChecker(reg), pe
+	switch *mode {
+	case "suggest":
+		// Read-only: deny all writes and shell execution.
+		return permission.ReadOnlyChecker(), pe
+	case "full-auto":
+		// Allow everything; policy engine still enforces hard denies.
+		return pe.AsAgentCheckerFullAuto(reg), pe
+	default: // "auto-edit"
+		return pe.AsAgentChecker(reg), pe
+	}
 }
 
 // ── Server mode ─────────────────────────────────────────────────────────────
@@ -175,10 +186,9 @@ func (r *agentRunner) Run(ctx context.Context, req server.AgentRunRequest) (*ser
 		return nil, err
 	}
 	engine := graph.NewEngine(g)
+	messages := append(req.History, agent.Message{Role: agent.RoleUser, Content: req.Message})
 	result, err := engine.Run(ctx, &agent.MessageState{
-		Messages: []agent.Message{
-			{Role: agent.RoleUser, Content: req.Message},
-		},
+		Messages: messages,
 		MaxSteps: maxSteps,
 	})
 	if err != nil {
@@ -212,10 +222,9 @@ func (r *agentRunner) RunStream(ctx context.Context, req server.AgentRunRequest,
 
 	engine := graph.NewEngine(g)
 	hook := &streamHook{onEvent: onEvent}
+	messages := append(req.History, agent.Message{Role: agent.RoleUser, Content: req.Message})
 	state := &agent.MessageState{
-		Messages: []agent.Message{
-			{Role: agent.RoleUser, Content: req.Message},
-		},
+		Messages: messages,
 		MaxSteps: maxSteps,
 	}
 	result, err := engine.Run(ctx, state, graph.WithHook(hook))
@@ -371,7 +380,7 @@ type tuiAgentRunner struct {
 	maxSteps    int
 }
 
-func (r *tuiAgentRunner) RunStream(ctx context.Context, input string, onEvent func(tui.StreamEvent)) {
+func (r *tuiAgentRunner) RunStream(ctx context.Context, input string, history []tui.ChatMsg, onEvent func(tui.StreamEvent)) {
 	// Build an AskFunc that bridges ToolNode "ask" decisions to the TUI confirm modal.
 	askFunc := func(ctx context.Context, toolName string, args map[string]any, reason string) bool {
 		respCh := make(chan bool, 1)
@@ -389,6 +398,19 @@ func (r *tuiAgentRunner) RunStream(ctx context.Context, input string, onEvent fu
 			return false
 		}
 	}
+
+	// Convert TUI chat history to agent messages.
+	var messages []agent.Message
+	for _, h := range history {
+		role := agent.RoleUser
+		if h.Role == "assistant" {
+			role = agent.RoleAssistant
+		}
+		if h.Content != "" {
+			messages = append(messages, agent.Message{Role: role, Content: h.Content})
+		}
+	}
+	messages = append(messages, agent.Message{Role: agent.RoleUser, Content: input})
 
 	ag := agent.NewReActAgent(agent.ReActAgentConfig{
 		Name:         "baize-tui",
@@ -414,9 +436,7 @@ func (r *tuiAgentRunner) RunStream(ctx context.Context, input string, onEvent fu
 	engine := graph.NewEngine(g)
 	hook := &tuiStreamHook{onEvent: onEvent}
 	state := &agent.MessageState{
-		Messages: []agent.Message{
-			{Role: agent.RoleUser, Content: input},
-		},
+		Messages: messages,
 		MaxSteps: r.maxSteps,
 	}
 	result, err := engine.Run(ctx, state, graph.WithHook(hook))
@@ -492,11 +512,28 @@ func buildToolRegistry(wsRoot string) *tool.ToolRegistry {
 	reg := tool.NewToolRegistry()
 	reg.Register(&builtin.CalculatorTool{})
 	reg.Register(&builtin.FileTool{WorkspaceRoot: wsRoot})
+	reg.Register(&builtin.GrepTool{WorkspaceRoot: wsRoot})
 	reg.Register(&builtin.ShellTool{WorkspaceRoot: wsRoot, MaxRuntime: 120 * time.Second})
 	reg.Register(&builtin.GitTool{WorkspaceRoot: wsRoot})
 	reg.Register(&builtin.WebSearchTool{})
 	reg.Register(&builtin.WebFetchTool{})
+
+	// Agent auto-memory tool.
+	home, _ := os.UserHomeDir()
+	memDir := filepath.Join(home, ".baize", "projects", slugifyPath(wsRoot), "memory")
+	if am, err := memory.NewAutoMemory(memDir); err == nil {
+		reg.Register(&builtin.MemorySaveTool{AutoMemory: am})
+	}
 	return reg
+}
+
+func slugifyPath(p string) string {
+	p = strings.ReplaceAll(p, "/", "-")
+	p = strings.ReplaceAll(p, "\\", "-")
+	if len(p) > 60 {
+		p = p[len(p)-60:]
+	}
+	return strings.Trim(p, "-")
 }
 
 func buildTools(wsRoot string) []agent.Tool {
@@ -505,12 +542,13 @@ func buildTools(wsRoot string) []agent.Tool {
 
 func buildSystemPrompt(wsRoot string) string {
 	hostname, _ := os.Hostname()
-	return fmt.Sprintf(`你是白泽（Baize），一名专为软件工程师打造的 AI 编程助手。
+	base := fmt.Sprintf(`你是白泽（Baize），一名专为软件工程师打造的 AI 编程助手。
 
 你运行在思考-行动循环中：分析问题，选择工具，执行操作，观察结果，迭代直到任务完成。
 
 == 可用工具 ==
 - file: 文件读写、编辑（字符串替换）、目录列表、glob 搜索。所有路径相对于工作区。
+- grep: 正则/字符串搜索文件内容，返回文件名:行号:匹配内容。支持 --include 过滤文件类型。
 - shell: 执行 Shell 命令（工作区 %s）。超时 120s。危险命令已屏蔽。
 - git: status、diff、log、add、commit、branch、checkout。
 - web_search: 通过 DuckDuckGo 搜索网页。返回前 10 条结果（标题+URL+摘要）。
@@ -528,6 +566,13 @@ func buildSystemPrompt(wsRoot string) string {
 
 当前工作区：%s
 主机：%s`, wsRoot, wsRoot, hostname)
+
+	// Append project-level instructions from BAIZE.md files.
+	loader := &baizecontext.InstructionLoader{ProjectRoot: wsRoot}
+	if instructions := loader.Load(); instructions != "" {
+		base += "\n\n== 项目指令 ==\n" + instructions
+	}
+	return base
 }
 
 // ── CLI Hook ────────────────────────────────────────────────────────────────
@@ -562,7 +607,7 @@ func (h *cliHook) OnRetry(_ context.Context, _ string, _ int, _ error) {}
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `Baize — Unified AI Agent Platform
+	fmt.Fprintf(os.Stderr, `Baize — Unified AI Agent Platform  (v%s, %s)
 
 Usage:
   baize [flags] "question"     Single-shot agent query.
@@ -570,7 +615,7 @@ Usage:
   baize server [flags]          API server.
 
 Flags:
-`)
+`, version.Version, version.Commit)
 	flag.PrintDefaults()
 }
 

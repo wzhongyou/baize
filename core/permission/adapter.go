@@ -86,6 +86,44 @@ func buildOperation(p Permission, toolName string, st tool.SafeTool, args map[st
 	return op
 }
 
+// AsAgentCheckerFullAuto wraps PolicyEngine as a checker that never asks —
+// only hard denies from policy rules are enforced.
+func (pe *PolicyEngine) AsAgentCheckerFullAuto(reg *tool.ToolRegistry) agent.PermissionChecker {
+	return &fullAutoAdapter{pe: pe, reg: reg}
+}
+
+type fullAutoAdapter struct {
+	pe  *PolicyEngine
+	reg *tool.ToolRegistry
+}
+
+func (a *fullAutoAdapter) CheckPermission(ctx context.Context, toolName string, args map[string]any) (string, string) {
+	t, ok := a.reg.Get(toolName)
+	if !ok {
+		return "deny", fmt.Sprintf("unknown tool: %s", toolName)
+	}
+	st, isSafe := t.(tool.SafeTool)
+	if !isSafe {
+		return "allow", ""
+	}
+	for _, p := range st.RequiredPermissions() {
+		op := buildOperation(Permission(p), toolName, st, args)
+		if a.pe.Check(ctx, op) == DecisionDeny {
+			return "deny", fmt.Sprintf("%s: %s not allowed", toolName, p)
+		}
+	}
+	return "allow", ""
+}
+
+// ReadOnlyChecker returns a checker that denies all write/exec operations.
+func ReadOnlyChecker() agent.PermissionChecker { return readOnlyChecker{} }
+
+type readOnlyChecker struct{}
+
+func (readOnlyChecker) CheckPermission(_ context.Context, _ string, _ map[string]any) (string, string) {
+	return "deny", "suggest mode: no writes or execution allowed"
+}
+
 func extractCommand(args map[string]any) string {
 	if cmd, ok := args["command"].(string); ok {
 		return cmd

@@ -9,8 +9,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/wzhongyou/baize/protocol"
+	"github.com/wzhongyou/baize/core/agent"
 	"github.com/wzhongyou/baize/core/session"
+	"github.com/wzhongyou/baize/protocol"
 )
 
 // Server is the Baize API server.
@@ -32,10 +33,13 @@ type AgentRunner interface {
 type AgentRunRequest struct {
 	SessionID string
 	Message   string
+	History   []agent.Message // prior conversation messages, injected into MessageState
 	Provider  string
 	Model     string
 	MaxSteps  int
 }
+
+var defaultBudget = agent.DefaultContextBudget()
 
 // AgentRunResult is the final output of an agent run.
 type AgentRunResult struct {

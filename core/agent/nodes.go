@@ -20,6 +20,7 @@ type LLMNodeConfig struct {
 	Stream           bool
 	OnChunk          func(*StreamChunk)      // called for each streaming chunk
 	StructuredOutput *StructuredOutputConfig // structured output config
+	TodoManager      *TodoManager            // optional: injects todo.md before each call
 }
 
 // LLMNode calls an LLM and appends the assistant reply to MessageState.Messages.
@@ -30,6 +31,10 @@ func NewLLMNode(cfg LLMNodeConfig) *LLMNode { return &LLMNode{cfg: cfg} }
 
 // Run implements graph.NodeFunc[*MessageState].
 func (n *LLMNode) Run(ctx context.Context, s *MessageState) (*MessageState, error) {
+	// Inject todo.md into context just before the LLM call.
+	if n.cfg.TodoManager != nil {
+		n.cfg.TodoManager.InjectIntoState(s)
+	}
 	messages := n.buildMessages(s)
 	req := &ChatRequest{
 		Messages:     messages,
@@ -202,6 +207,9 @@ func (n *ToolNode) Run(ctx context.Context, s *MessageState) (*MessageState, err
 		return s, nil
 	}
 
+	if n.parallel && len(last.ToolCalls) > 1 {
+		return n.runParallel(ctx, s, last.ToolCalls)
+	}
 	for _, tc := range last.ToolCalls {
 		result := n.executeToolCall(ctx, tc)
 		s.Messages = append(s.Messages, Message{
@@ -211,6 +219,39 @@ func (n *ToolNode) Run(ctx context.Context, s *MessageState) (*MessageState, err
 			ToolName:   tc.Name,
 			Timestamp:  time.Now(),
 		})
+	}
+	return s, nil
+}
+
+func (n *ToolNode) runParallel(ctx context.Context, s *MessageState, calls []ToolCall) (*MessageState, error) {
+	type result struct {
+		index int
+		msg   Message
+	}
+	results := make([]result, len(calls))
+	ch := make(chan result, len(calls))
+
+	for i, tc := range calls {
+		i, tc := i, tc
+		go func() {
+			ch <- result{
+				index: i,
+				msg: Message{
+					Role:       RoleTool,
+					Content:    n.executeToolCall(ctx, tc),
+					ToolCallID: tc.ID,
+					ToolName:   tc.Name,
+					Timestamp:  time.Now(),
+				},
+			}
+		}()
+	}
+	for range calls {
+		r := <-ch
+		results[r.index] = r
+	}
+	for _, r := range results {
+		s.Messages = append(s.Messages, r.msg)
 	}
 	return s, nil
 }
@@ -244,7 +285,18 @@ func (n *ToolNode) executeToolCall(ctx context.Context, tc ToolCall) string {
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	return result
+	return truncateToolOutput(result)
+}
+
+const maxToolOutputChars = 20000 // ~5K tokens
+
+func truncateToolOutput(s string) string {
+	if len(s) <= maxToolOutputChars {
+		return s
+	}
+	head := s[:maxToolOutputChars/2]
+	tail := s[len(s)-maxToolOutputChars/2:]
+	return head + fmt.Sprintf("\n...[output truncated: %d chars total]...\n", len(s)) + tail
 }
 
 // VectorRetrieveNode embeds the last user message and retrieves relevant documents.

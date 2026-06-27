@@ -66,10 +66,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Load existing messages.
-	messages := []agent.Message{}
-	if sess, err := s.sessions.GetSession(sessionID); err == nil {
-		messages = sess.Messages
+	// Load existing messages, trim to context budget.
+	var history []agent.Message
+	if msgs, err := s.sessions.GetMessages(sessionID); err == nil {
+		history = defaultBudget.Trim(msgs)
 	}
 
 	userMsg := agent.Message{
@@ -78,7 +78,6 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 	}
 	_ = s.sessions.AddMessage(sessionID, userMsg)
-	messages = append(messages, userMsg)
 
 	// Stream agent execution.
 	var assistantContent strings.Builder
@@ -86,6 +85,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	s.agent.RunStream(r.Context(), AgentRunRequest{
 		SessionID: sessionID,
 		Message:   req.Message,
+		History:   history,
 		Provider:  req.Provider,
 		Model:     req.Model,
 		MaxSteps:  req.MaxSteps,

@@ -10,6 +10,11 @@ import (
 	"github.com/wzhongyou/baize/core/tool"
 )
 
+const (
+	maxReadLines   = 500
+	maxToolOutputB = 40 * 1024 // 40KB raw output cap before truncation
+)
+
 // FileTool provides file system operations: read, write, edit, list, and search.
 type FileTool struct {
 	WorkspaceRoot string // All paths are resolved relative to this root.
@@ -109,7 +114,13 @@ func (f *FileTool) read(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("file read %s: %w", path, err)
 	}
-	return string(data), nil
+	content := string(data)
+	lines := strings.Split(content, "\n")
+	if len(lines) > maxReadLines {
+		truncated := strings.Join(lines[:maxReadLines], "\n")
+		return truncated + fmt.Sprintf("\n...[truncated: showing %d of %d lines, use start_line/end_line to read more]", maxReadLines, len(lines)), nil
+	}
+	return content, nil
 }
 
 func (f *FileTool) write(path, content string) (string, error) {
@@ -132,11 +143,22 @@ func (f *FileTool) edit(path, oldStr, newStr string) (string, error) {
 	if count == 0 {
 		return "", fmt.Errorf("file edit: string not found in %s", path)
 	}
-	content = strings.Replace(content, oldStr, newStr, 1)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if count > 1 {
+		// Report line numbers of all occurrences to help the LLM provide more context.
+		var lineNums []string
+		for i, line := range strings.Split(content, "\n") {
+			if strings.Contains(line, oldStr) {
+				lineNums = append(lineNums, fmt.Sprintf("%d", i+1))
+			}
+		}
+		return "", fmt.Errorf("file edit: old_string matches %d times in %s (lines: %s) — provide more context to make it unique",
+			count, path, strings.Join(lineNums, ", "))
+	}
+	updated := strings.Replace(content, oldStr, newStr, 1)
+	if err := os.WriteFile(path, []byte(updated), 0644); err != nil {
 		return "", fmt.Errorf("file edit %s: %w", path, err)
 	}
-	return fmt.Sprintf("Replaced 1 occurrence in %s (%d total occurrences found)", path, count), nil
+	return fmt.Sprintf("Edited %s", path), nil
 }
 
 func (f *FileTool) list(path string) (string, error) {

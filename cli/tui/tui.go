@@ -23,7 +23,7 @@ type Config struct {
 }
 
 type StreamRunner interface {
-	RunStream(ctx context.Context, input string, onEvent func(StreamEvent))
+	RunStream(ctx context.Context, input string, history []ChatMsg, onEvent func(StreamEvent))
 }
 
 type StreamEvent struct {

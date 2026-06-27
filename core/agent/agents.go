@@ -21,6 +21,7 @@ type ReActAgentConfig struct {
 	AskFunc      AskFunc           // optional: handles "ask" decisions via user I/O
 	Stream       bool              // enable streaming LLM responses
 	OnChunk      func(*StreamChunk) // called for each streaming chunk
+	TodoManager  *TodoManager      // optional: injects todo.md into context before each LLM call
 }
 
 // ReActAgent builds a Reason-Act loop graph.
@@ -43,14 +44,17 @@ func (a *ReActAgent) Name() string { return a.cfg.Name }
 // BuildGraph constructs and compiles the ReAct graph.
 // Structure: llm ──(has tool calls)──→ tool ──→ llm (loop)
 func (a *ReActAgent) BuildGraph() (*graph.Graph[*MessageState], error) {
+	todo := a.cfg.TodoManager
 	llmNode := NewLLMNode(LLMNodeConfig{
 		Model:        a.cfg.LLM,
 		SystemPrompt: a.cfg.SystemPrompt,
 		Tools:        a.cfg.Tools,
 		Stream:       a.cfg.Stream,
 		OnChunk:      a.cfg.OnChunk,
+		TodoManager:  todo,
 	})
 	toolNode := NewToolNode(a.cfg.Tools...)
+	toolNode.parallel = true
 	if a.cfg.PermChecker != nil {
 		toolNode.WithPermissionChecker(a.cfg.PermChecker)
 	}

@@ -20,7 +20,7 @@ func (m *Model) startAgent(text string) tea.Cmd {
 	go func() {
 		defer close(ch)
 
-		m.runner.RunStream(m.ctx, text, func(ev StreamEvent) {
+		m.runner.RunStream(m.ctx, text, m.messages, func(ev StreamEvent) {
 			se := streamEvent{
 				Type:     ev.Type,
 				Content:  ev.Content,

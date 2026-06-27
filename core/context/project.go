@@ -6,6 +6,7 @@
 package context
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,6 +82,7 @@ func Analyze(root string, opts AnalysisOptions) (*Project, error) {
 			p.TestTools = appendUnique(p.TestTools, "go test")
 			p.Linters = appendUnique(p.Linters, "golangci-lint")
 			p.PackageFile = "go.mod"
+			readGoMod(filepath.Join(root, name), p)
 		case name == "go.sum":
 			// Companion file to go.mod.
 		case name == "package.json":
@@ -88,6 +90,7 @@ func Analyze(root string, opts AnalysisOptions) (*Project, error) {
 			p.BuildTools = appendUnique(p.BuildTools, "npm/yarn")
 			p.TestTools = appendUnique(p.TestTools, "jest/vitest")
 			p.PackageFile = "package.json"
+			readPackageJSON(filepath.Join(root, name), p)
 		case name == "Cargo.toml":
 			p.Languages = appendUnique(p.Languages, "Rust")
 			p.BuildTools = appendUnique(p.BuildTools, "cargo build")
@@ -158,7 +161,56 @@ func (p *Project) Summary() string {
 	return b.String()
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+func readGoMod(path string, p *Project) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "module ") {
+			p.ConfigFiles = appendUnique(p.ConfigFiles, strings.TrimPrefix(line, "module "))
+		}
+	}
+}
+
+type pkgJSON struct {
+	Scripts      map[string]string `json:"scripts"`
+	Dependencies map[string]string `json:"dependencies"`
+}
+
+func readPackageJSON(path string, p *Project) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var pkg pkgJSON
+	if err := jsonUnmarshal(data, &pkg); err != nil {
+		return
+	}
+	for name := range pkg.Dependencies {
+		switch {
+		case name == "react" || name == "react-dom":
+			p.Frameworks = appendUnique(p.Frameworks, "React")
+		case name == "vue":
+			p.Frameworks = appendUnique(p.Frameworks, "Vue")
+		case name == "next":
+			p.Frameworks = appendUnique(p.Frameworks, "Next.js")
+		case name == "express":
+			p.Frameworks = appendUnique(p.Frameworks, "Express")
+		}
+	}
+	if s, ok := pkg.Scripts["test"]; ok {
+		p.TestTools = appendUnique(p.TestTools, s)
+	}
+	if s, ok := pkg.Scripts["build"]; ok {
+		p.BuildTools = appendUnique(p.BuildTools, s)
+	}
+}
+
+func jsonUnmarshal(data []byte, v any) error {
+	return json.Unmarshal(data, v)
+}
 
 func appendUnique(slice []string, s string) []string {
 	for _, existing := range slice {
