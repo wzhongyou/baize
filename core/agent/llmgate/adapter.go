@@ -141,6 +141,25 @@ func convertMessages(msgs []agent.Message) []core.Message {
 			Content:          m.Content,
 			ReasoningContent: m.ReasoningContent,
 		}
+		if len(m.Images) > 0 {
+			parts := make([]core.ContentPart, 0, 1+len(m.Images))
+			if m.Content != "" {
+				parts = append(parts, core.ContentPart{Type: "text", Text: m.Content})
+			}
+			for _, img := range m.Images {
+				// accept both "data:image/...;base64,..." and raw base64
+				url := img
+				if len(img) > 0 && img[:4] != "data" {
+					url = "data:image/png;base64," + img
+				}
+				parts = append(parts, core.ContentPart{
+					Type:     "image_url",
+					ImageURL: &core.ImageURL{URL: url},
+				})
+			}
+			out[i].Content = ""
+			out[i].ContentParts = parts
+		}
 		for _, tc := range m.ToolCalls {
 			out[i].ToolCalls = append(out[i].ToolCalls, convertAgentToolCall(tc))
 		}

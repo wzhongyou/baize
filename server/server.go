@@ -33,6 +33,7 @@ type AgentRunner interface {
 type AgentRunRequest struct {
 	SessionID string
 	Message   string
+	Images    []string        // base64-encoded images attached to the user message
 	History   []agent.Message // prior conversation messages, injected into MessageState
 	Provider  string
 	Model     string
@@ -50,11 +51,12 @@ type AgentRunResult struct {
 
 // StreamEvent is a single event emitted during agent execution.
 type StreamEvent struct {
-	Type     string         `json:"type"` // "thought", "tool_call", "tool_result", "answer", "done"
-	Content  string         `json:"content,omitempty"`
-	ToolName string         `json:"tool_name,omitempty"`
-	ToolArgs map[string]any `json:"tool_args,omitempty"`
-	Tokens   int            `json:"tokens,omitempty"`
+	Type     string                  `json:"type"` // "thought", "tool_call", "tool_result", "answer", "done"
+	Content  string                  `json:"content,omitempty"`
+	Blocks   []protocol.ContentBlock `json:"blocks,omitempty"`
+	ToolName string                  `json:"tool_name,omitempty"`
+	ToolArgs map[string]any          `json:"tool_args,omitempty"`
+	Tokens   int                     `json:"tokens,omitempty"`
 }
 
 // Config holds server configuration.

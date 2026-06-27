@@ -10,6 +10,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -27,6 +28,7 @@ import (
 	"github.com/wzhongyou/baize/core/memory"
 	"github.com/wzhongyou/baize/core/permission"
 	"github.com/wzhongyou/baize/internal/version"
+	"github.com/wzhongyou/baize/protocol"
 	"github.com/wzhongyou/baize/server"
 	"github.com/wzhongyou/baize/core/tool"
 	"github.com/wzhongyou/baize/core/tool/builtin"
@@ -186,7 +188,7 @@ func (r *agentRunner) Run(ctx context.Context, req server.AgentRunRequest) (*ser
 		return nil, err
 	}
 	engine := graph.NewEngine(g)
-	messages := append(req.History, agent.Message{Role: agent.RoleUser, Content: req.Message})
+	messages := append(req.History, agent.Message{Role: agent.RoleUser, Content: req.Message, Images: req.Images})
 	result, err := engine.Run(ctx, &agent.MessageState{
 		Messages: messages,
 		MaxSteps: maxSteps,
@@ -213,6 +215,15 @@ func (r *agentRunner) RunStream(ctx context.Context, req server.AgentRunRequest,
 		Tools:        r.tools,
 		MaxSteps:     maxSteps,
 		PermChecker:  r.permChecker,
+		Stream:       true,
+		OnChunk: func(chunk *agent.StreamChunk) {
+			if chunk.ReasoningContent != "" {
+				onEvent(server.StreamEvent{Type: "thought", Content: chunk.ReasoningContent})
+			}
+			if chunk.Content != "" {
+				onEvent(server.StreamEvent{Type: "answer", Content: chunk.Content})
+			}
+		},
 	})
 	g, err := ag.BuildGraph()
 	if err != nil {
@@ -222,7 +233,7 @@ func (r *agentRunner) RunStream(ctx context.Context, req server.AgentRunRequest,
 
 	engine := graph.NewEngine(g)
 	hook := &streamHook{onEvent: onEvent}
-	messages := append(req.History, agent.Message{Role: agent.RoleUser, Content: req.Message})
+	messages := append(req.History, agent.Message{Role: agent.RoleUser, Content: req.Message, Images: req.Images})
 	state := &agent.MessageState{
 		Messages: messages,
 		MaxSteps: maxSteps,
@@ -233,9 +244,6 @@ func (r *agentRunner) RunStream(ctx context.Context, req server.AgentRunRequest,
 		return
 	}
 
-	if content := lastAssistantContent(result.FinalState); content != "" {
-		onEvent(server.StreamEvent{Type: "answer", Content: content})
-	}
 	onEvent(server.StreamEvent{Type: "done", Tokens: result.FinalState.TotalTokens})
 }
 
@@ -266,10 +274,29 @@ func (h *streamHook) OnNodeEnd(_ context.Context, _ string, s *agent.MessageStat
 			h.onEvent(server.StreamEvent{Type: "tool_call", ToolName: tc.Name, Content: fmt.Sprintf("%v", tc.Arguments)})
 		}
 	case last.Role == agent.RoleTool:
-		h.onEvent(server.StreamEvent{Type: "tool_result", Content: last.Content})
+		if blocks := parseRichBlocks(last.Content); blocks != nil {
+			h.onEvent(server.StreamEvent{Type: "tool_result", Blocks: blocks})
+		} else {
+			h.onEvent(server.StreamEvent{Type: "tool_result", Content: last.Content})
+		}
 	}
 }
 func (h *streamHook) OnRetry(_ context.Context, _ string, _ int, _ error) {}
+
+// parseRichBlocks detects the __baize_blocks envelope from MCP/skill tool results.
+// Returns nil for plain-text results so callers can fall back to Content.
+func parseRichBlocks(content string) []protocol.ContentBlock {
+	if len(content) == 0 || content[0] != '{' {
+		return nil
+	}
+	var env struct {
+		Blocks []protocol.ContentBlock `json:"__baize_blocks"`
+	}
+	if err := json.Unmarshal([]byte(content), &env); err != nil || len(env.Blocks) == 0 {
+		return nil
+	}
+	return env.Blocks
+}
 
 // ── Core execution ──────────────────────────────────────────────────────────
 

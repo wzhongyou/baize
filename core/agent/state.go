@@ -18,6 +18,7 @@ type Message struct {
 	ID               string         `json:"id"`
 	Role             Role           `json:"role"`
 	Content          string         `json:"content"`
+	Images           []string       `json:"images,omitempty"` // base64-encoded images attached to this message
 	ReasoningContent string         `json:"reasoning_content,omitempty"` // thinking mode reasoning
 	ToolCalls        []ToolCall     `json:"tool_calls,omitempty"`
 	ToolCallID       string         `json:"tool_call_id,omitempty"` // matches ToolCall.ID for tool results

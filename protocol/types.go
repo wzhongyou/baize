@@ -62,20 +62,32 @@ const (
 
 // ChatRequest is sent to POST /api/v1/chat to start a streaming agent run.
 type ChatRequest struct {
-	SessionID string `json:"session_id,omitempty"` // empty = auto-create
-	Message   string `json:"message"`
-	Provider  string `json:"provider,omitempty"`  // override llmgate provider
-	Model     string `json:"model,omitempty"`     // override model
-	MaxSteps  int    `json:"max_steps,omitempty"` // default 30
+	SessionID string   `json:"session_id,omitempty"` // empty = auto-create
+	Message   string   `json:"message"`
+	Images    []string `json:"images,omitempty"` // base64-encoded images ("data:image/png;base64,..." or raw base64)
+	Provider  string   `json:"provider,omitempty"`  // override llmgate provider
+	Model     string   `json:"model,omitempty"`     // override model
+	MaxSteps  int      `json:"max_steps,omitempty"` // default 30
+}
+
+// ContentBlock is a structured unit of rich content in a chat event.
+// Clients render by type; unknown types should fall back to Meta["fallback_text"].
+type ContentBlock struct {
+	Type    string         `json:"type"`              // "text" | "image" | "code" | "html" | custom
+	Content string         `json:"content,omitempty"` // for text/code/html
+	Lang    string         `json:"lang,omitempty"`    // for type=code
+	Data    string         `json:"data,omitempty"`    // for type=image, base64 data URL
+	Meta    map[string]any `json:"meta,omitempty"`    // skill-defined metadata / fallback_text
 }
 
 // ChatEvent is streamed via SSE from POST /api/v1/chat.
 type ChatEvent struct {
-	Type     string `json:"type"` // "thought", "tool_call", "tool_result", "answer", "done", "error"
-	Content  string `json:"content,omitempty"`
-	ToolName string `json:"tool_name,omitempty"`
+	Type     string         `json:"type"` // "thought", "tool_call", "tool_result", "answer", "done", "error"
+	Content  string         `json:"content,omitempty"` // plain text / markdown; empty when Blocks is set
+	Blocks   []ContentBlock `json:"blocks,omitempty"`  // rich content from MCP/skills; takes priority over Content
+	ToolName string         `json:"tool_name,omitempty"`
 	ToolArgs map[string]any `json:"tool_args,omitempty"`
-	Tokens   int    `json:"tokens,omitempty"`
+	Tokens   int            `json:"tokens,omitempty"`
 }
 
 // SSE event type constants.

@@ -75,6 +75,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	userMsg := agent.Message{
 		Role:      agent.RoleUser,
 		Content:   req.Message,
+		Images:    req.Images,
 		Timestamp: time.Now(),
 	}
 	_ = s.sessions.AddMessage(sessionID, userMsg)
@@ -85,6 +86,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	s.agent.RunStream(r.Context(), AgentRunRequest{
 		SessionID: sessionID,
 		Message:   req.Message,
+		Images:    req.Images,
 		History:   history,
 		Provider:  req.Provider,
 		Model:     req.Model,
