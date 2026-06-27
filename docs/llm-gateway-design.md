@@ -129,6 +129,63 @@ llmgate 的核心功能（provider 覆盖、流式、工具调用、推理模式
 
 ---
 
+## 多模态路由：Vision 模型感知
+
+不是所有 provider 都支持视觉输入。当 `ChatRequest` 包含 `images` 字段时，需要自动路由到支持 vision 的 provider：
+
+```go
+// llmgate 需要在 provider 元数据中标记能力
+type ProviderCapabilities struct {
+    Vision    bool  // 支持图片输入
+    Thinking  bool  // 支持推理模式
+    FIM       bool  // 支持 Fill-In-Middle（Tab 补全）
+    MaxTokens int
+}
+```
+
+路由规则：请求包含 `ContentParts` 且有 `image_url` 类型时，过滤掉不支持 vision 的 provider 再走正常路由策略。
+
+**国内支持 vision 的主要 provider**：Qwen-VL、DeepSeek-V3（部分）、文心 4.0、GLM-4V、Kimi Vision。
+
+### 图片预处理（计划中）
+
+大图直接发给 LLM 成本高。在 adapter 层做自动压缩：
+
+```go
+const maxImageDimension = 1568  // Anthropic 推荐最大边长
+const maxBase64SizeKB   = 1024  // 超过则压缩
+
+// 压缩策略：等比缩放 + JPEG 质量 85
+```
+
+---
+
+## 本地模型支持：Ollama / LM Studio
+
+对"中文最好的开源编程助手"目标，本地模型支持是重要差异化点（隐私、无网络依赖、无 API 费用）。
+
+主流本地推理方案均暴露 OpenAI 兼容接口：
+
+| 方案 | 默认端口 | 协议 |
+|------|---------|------|
+| Ollama | 11434 | OpenAI compat |
+| LM Studio | 1234 | OpenAI compat |
+| llama.cpp server | 8080 | OpenAI compat |
+
+llmgate 已有 `openai-compat` 通用 provider，配置本地模型只需：
+
+```toml
+[providers.ollama]
+type    = "openai-compat"
+base_url = "http://localhost:11434/v1"
+api_key  = "ollama"  # 占位，本地不校验
+models   = ["qwen2.5-coder:7b", "deepseek-coder-v2:16b"]
+```
+
+**需要补充**：llmgate 的 `ProviderCapabilities` 对本地模型要手动配置（能力不能自动探测），建议增加 `GET /v1/models` 自动发现机制。
+
+---
+
 ## 实现优先级
 
 | 优先级 | 内容 | 状态 |

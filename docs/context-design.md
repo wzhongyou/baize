@@ -144,3 +144,44 @@ paths:
 ### 加载时机
 
 会话启动时由 `buildSystemPrompt` 读取，注入 `[2] system: BAIZE.md` 位置。压缩后从磁盘重读。
+
+---
+
+## Prompt 工程设计
+
+### 模型适配
+
+不同模型对 system prompt 格式有不同偏好，同一 prompt 在不同模型上效果差异明显：
+
+| 模型系列 | 最佳实践 |
+|---------|---------|
+| Claude（Anthropic）| XML 标签包裹内容块效果最好，如 `<tools>`, `<context>` |
+| DeepSeek / Qwen | Markdown 格式清晰即可，避免过多 XML |
+| 思考模型（R1/QwQ）| 避免在 system prompt 里给出"思考步骤"，让模型自主推理 |
+
+**当前问题**：`buildSystemPrompt` 对所有模型输出同一个 prompt，没有按模型适配。
+
+计划在 llmgate adapter 层根据 provider 选择 prompt 变体（P2）。
+
+### System Prompt 版本管理
+
+`buildSystemPrompt` 是硬编码函数，每次改动无法追踪效果变化。
+
+计划：
+- 提取到 `core/prompt/` 包，每个变体有版本号
+- Eval 运行时记录使用的 prompt 版本（关联 [eval-design.md](eval-design.md)）
+- A/B 测试：同一任务用两个 prompt 版本运行，对比 pass rate
+
+### Agent 能力边界声明
+
+当 agent 不知道如何完成任务时，当前行为是"硬撑"——多轮尝试后失败，用户不知道为何失败。
+
+System prompt 应明确声明 agent 的能力边界和请求澄清的原则：
+
+```
+== 行为边界 ==
+- 任务不清晰时，先提问而不是猜测
+- 无法确定文件路径时，先用 grep/glob 搜索
+- 无法在 max_steps 内完成时，汇报当前进度并说明剩余工作
+- 不编造不存在的 API、文件名、函数名
+```

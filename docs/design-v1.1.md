@@ -88,6 +88,7 @@
 
 | 文档                                            | 内容                                                                   |
 | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| [eval-design.md](eval-design.md)               | 评测体系：golden dataset、任务成功率、幻觉检测、prompt 回归测试 |
 | [tui-cli-design.md](tui-cli-design.md)             | TUI（Bubble Tea）与 CLI 设计：flags、斜线命令、流式渲染、权限确认 UI   |
 | [vscode-extension-design.md](vscode-extension-design.md) | VSCode 插件：WebView、SSE 客户端、IDE 上下文注入、权限弹窗        |
 | [jetbrains-plugin-design.md](jetbrains-plugin-design.md) | JetBrains 插件：Kotlin、JCef WebView、OkHttp SSE、Action 注册    |

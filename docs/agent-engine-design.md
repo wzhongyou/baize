@@ -231,3 +231,38 @@ ask   = ["shell:*", "file_edit:*.toml"]
 | P1 | API 层 permission_request + confirm 端点 | 待实现 |
 | P1 | .baize/settings.toml glob 规则 | 待实现 |
 | P2 | 阶段化执行 + 验证门 | 见 multi-agent-design.md |
+
+---
+
+## 错误恢复与自愈
+
+### 工具调用失败重试策略
+
+工具返回 `error:` 前缀结果时，LLM 当前靠自然语言推理决定下一步，没有结构化保障。
+
+设计三级重试策略（计划中）：
+
+| 失败类型 | 策略 |
+|---------|------|
+| 文件不存在 | 自动触发 `grep`/`glob` 搜索正确路径，重试 |
+| 权限拒绝 | 停止重试，推送 `permission_request` 给用户 |
+| 命令超时 | 在 tool_result 追加提示"命令超时，建议拆分或缩小范围" |
+| LLM 幻觉（路径/函数不存在）| 追加系统消息"请先用 glob/grep 确认路径存在" |
+
+### 自我反思节点（计划中）
+
+参考 Claude Code 的"think before acting"模式，在高风险工具调用前插入反思步骤：
+
+```
+[tool_call: file_edit]
+    ↓
+[reflection node] 检查：old_string 是否唯一？影响范围是否符合预期？
+    ↓ 确认
+[execute]
+```
+
+反思节点使用 `StructuredOutput` 约束 LLM 输出结构化判断，不依赖 LLM 自然语言决策。
+
+### 幻觉检测
+
+见 [eval-design.md](eval-design.md) 幻觉检测章节。检测到幻觉时自动注入纠正提示，不中断执行。
